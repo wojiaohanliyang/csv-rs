@@ -33,4 +33,3 @@ impl From<ErrorStack> for Error {
         Error::IoError(io::Error::from(error))
     }
 }
-

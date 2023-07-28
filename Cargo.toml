@@ -12,5 +12,9 @@ hw_tests = []
 
 [dependencies]
 openssl = "0.10.55"
-iocuddle = "0.1"
-static_assertions = "^1.1.0"
+openssl-sys = "0.9.90"
+iocuddle = "0.1.1"
+static_assertions = "1.1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde-big-array = "0.5.1"
+codicon = "3.0"
