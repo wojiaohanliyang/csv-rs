@@ -9,6 +9,7 @@ pub use ioctl::*;
 mod types;
 pub use types::*;
 use std::fs::{File, OpenOptions};
+use rand::Rng;
 
 /// A handle to the CSV guest device.
 pub struct CsvGuest(File);
@@ -26,9 +27,19 @@ impl CsvGuest {
     pub fn get_report(
         &mut self,
         data: Option<[u8; 64]>,
-        mnonce: [u8; 16],
+        mnonce: Option<[u8; 16]>,
     ) -> Result<(AttestationReport, ReportSigner), Error> {
-        let report_request = ReportReq::new(data, mnonce)?;
+        let mut mnonce_value = [0u8; 16];
+        if let Some(mnonce) = mnonce {
+            mnonce_value = mnonce;
+        } else {
+            let mut rng = rand::thread_rng();
+            for element in &mut mnonce_value {
+                *element = rng.gen();
+            }
+        }
+
+        let report_request = ReportReq::new(data, mnonce_value)?;
 
         let mut report_response = ReportRsp::default();
 
@@ -50,7 +61,7 @@ impl CsvGuest {
 
         CSV_GET_REPORT.ioctl(&mut self.0, &mut guest_report_request)?;
 
-        report_response.signer.verify(&report_response.report.mnonce, &report_response.report.anonce)?;
+        report_response.signer.verify(&mnonce_value, &report_response.report.mnonce, &report_response.report.anonce)?;
 
         Ok((report_response.report, report_response.signer))
     }

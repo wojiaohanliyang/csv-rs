@@ -28,12 +28,27 @@ fn get_report() {
 
     let mut csv_guest = CsvGuest::open().unwrap();
 
-    let (report, sig_evi) = csv_guest.get_report(Some(data), mnonce).unwrap();
+    let (report, signer) = csv_guest.get_report(Some(data), Some(mnonce)).unwrap();
 
     xor_anonce(&mut data, report.anonce);
     xor_anonce(&mut mnonce, report.anonce);
 
     assert_eq!(mnonce, report.mnonce);
     assert_eq!(data, report.report_data);
-    assert_eq!([0u8; 32], sig_evi.reserved);
+    assert_eq!([0u8; 32], signer.reserved);
+}
+
+#[cfg_attr(not(has_dev_csv_guest), ignore)]
+#[test]
+fn get_report_without_input() {
+    let mut data: [u8; 64] = [0; 64];
+
+    let mut csv_guest = CsvGuest::open().unwrap();
+
+    let (report, signer) = csv_guest.get_report(None, None).unwrap();
+
+    xor_anonce(&mut data, report.anonce);
+
+    assert_eq!(data, report.report_data);
+    assert_eq!([0u8; 32], signer.reserved);
 }

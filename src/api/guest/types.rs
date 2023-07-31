@@ -13,6 +13,9 @@ use openssl::{
 
 use static_assertions::const_assert;
 
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
+
 /// Data provieded by the guest owner for requesting an attestation report
 /// from the HYGON Secure Processor.
 #[repr(C)]
@@ -45,6 +48,7 @@ impl ReportReq {
         }
 
         request.mnonce = mnonce;
+
         request.calculate_hash()?;
 
         Ok(request)
@@ -95,10 +99,12 @@ impl Default for ReportRsp {
 /// Data provieded by the guest owner for requesting an attestation report
 /// from the HYGON Secure Processor.
 #[repr(C)]
+#[derive(Serialize, Deserialize)]
 pub struct AttestationReport {
     pub user_pubkey_digest: [u8; 32],
     pub vm_id: [u8; 16],
     pub vm_version: [u8; 16],
+    #[serde(with = "BigArray")]
     pub report_data: [u8; 64],
     pub mnonce: [u8; 16],
     pub measure: [u8; 32],
@@ -106,6 +112,7 @@ pub struct AttestationReport {
     pub sig_usage: u32,
     pub sig_algo: u32,
     pub anonce: u32,
+    #[serde(with = "BigArray")]
     pub sig: [u8; 144],
 }
 
@@ -128,8 +135,11 @@ impl Default for AttestationReport {
 }
 
 #[repr(C)]
+#[derive(Serialize, Deserialize)]
 pub struct ReportSigner {
+    #[serde(with = "BigArray")]
     pub pek_cert: [u8; 2084],
+    #[serde(with = "BigArray")]
     pub sn: [u8; 64],
     pub reserved: [u8; 32],
     pub mac: [u8; 32],
@@ -137,8 +147,13 @@ pub struct ReportSigner {
 
 impl ReportSigner {
     /// Verifies the signature evidence's hmac.
-    pub fn verify(&mut self, mnonce: &[u8], anonce: &u32) -> Result<(), Error> {
+    pub fn verify(&mut self, input_mnonce: &[u8], mnonce: &[u8], anonce: &u32) -> Result<(), Error> {
         let real_mnonce = self.recover_mnonce(mnonce, anonce);
+
+        if real_mnonce != input_mnonce {
+            return Err(Error::BadSignature);
+        }
+
         let key = pkey::PKey::hmac(&real_mnonce)?;
         let mut sig = sign::Signer::new(MessageDigest::sm3(), &key)?;
 
