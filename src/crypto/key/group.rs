@@ -4,9 +4,10 @@
 
 use std::io::{Error, ErrorKind, Result};
 use openssl::{ec, nid};
+use serde::{Deserialize, Serialize};
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Group(u32);
 
 impl Group {

@@ -10,9 +10,10 @@ use crate::{
     util::*,
 };
 use std::io::{Error, ErrorKind, Result, Write, Read};
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 
-
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct Pubkey {
     pub usage: Usage,
     pub algo: Algorithm,
@@ -20,34 +21,37 @@ pub struct Pubkey {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct Data {
     pub firmware: crate::Version,
     pub reserved1: u16,
     pub pubkey: Pubkey,
     pub uid_size: u16,
+    #[serde(with = "BigArray")]
     pub user_id: [u8; 254],
     pub sid: [u8; 16],
+    #[serde(with = "BigArray")]
     pub reserved2: [u8; 608],
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct Body {
     pub ver: u32,
     pub data: Data,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct Signatures {
     usage: Usage,
     algo: Algorithm,
     signature: ecdsa::Signature,
+    #[serde(with = "BigArray")]
     _reserved: [u8; 256],
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct  Certificate {
     pub body: Body,
     pub sigs: [Signatures; 2],

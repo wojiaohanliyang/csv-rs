@@ -11,9 +11,11 @@ use crate::{
 };
 
 use std::io::{Error, Result, Write, Read};
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct Data {
     pub kid: [u8; 16],
     pub sid: [u8; 16],
@@ -22,25 +24,27 @@ pub struct Data {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct Preamble {
     pub ver: u32,
     pub data: Data,
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct Body {
     pub preamble: Preamble,
     pub pubkey: ecc::PubKey,
     pub uid_size: u16,
+    #[serde(with = "BigArray")]
     pub user_id: [u8; 254],
+    #[serde(with = "BigArray")]
     pub reserved: [u8; 108],
 }
 
 /// A Certificate Authority chain.
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct  Certificate {
     pub body: Body,
     signature: ecdsa::Signature,

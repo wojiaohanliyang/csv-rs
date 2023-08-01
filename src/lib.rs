@@ -17,9 +17,11 @@ pub mod error;
 
 mod util;
 
+use serde::{Deserialize, Serialize};
+
 /// Information about the CSV platform version.
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct Version {
     /// The major version number.
     pub major: u8,

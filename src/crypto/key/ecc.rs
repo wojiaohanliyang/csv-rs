@@ -10,13 +10,17 @@ use crate::{
     util::*,
 };
 use std::io::{Error, Result};
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 
 /// The Raw format of ecc pubkey.
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct PubKey {
     pub g: Group,
+    #[serde(with = "BigArray")]
     pub x: [u8; 72],
+    #[serde(with = "BigArray")]
     pub y: [u8; 72],
 }
 
