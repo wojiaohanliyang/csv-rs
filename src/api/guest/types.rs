@@ -145,10 +145,22 @@ pub struct ReportSigner {
     pub mac: [u8; 32],
 }
 
+fn xor_with_anonce(data: &mut [u8], anonce: &u32) -> Result<(), Error> {
+    let mut anonce_array = [0u8; 4];
+    anonce_array[..].copy_from_slice(&anonce.to_le_bytes());
+
+    for (index, item) in data.iter_mut().enumerate() {
+        *item ^= anonce_array[index % 4];
+    }
+
+    Ok(())
+}
+
 impl ReportSigner {
     /// Verifies the signature evidence's hmac.
     pub fn verify(&mut self, input_mnonce: &[u8], mnonce: &[u8], anonce: &u32) -> Result<(), Error> {
-        let real_mnonce = self.recover_mnonce(mnonce, anonce);
+        let mut real_mnonce = Vec::from(mnonce);
+        xor_with_anonce(&mut real_mnonce, anonce)?;
 
         if real_mnonce != input_mnonce {
             return Err(Error::BadSignature);
@@ -165,23 +177,20 @@ impl ReportSigner {
             return Err(Error::BadSignature);
         }
 
-        // reset reserved to 0.
-        self.reserved.fill(0);
+        // restore pek cert and serial number.
+        self.restore(anonce)?;
 
         Ok(())
     }
 
-    fn recover_mnonce(&self, mnonce: &[u8], anonce: &u32) -> Vec<u8> {
-        let mut real_mnonce: Vec<u8> = Vec::with_capacity(mnonce.len());
+    fn restore(&mut self, anonce: &u32) -> Result<(), Error> {
+        xor_with_anonce(&mut self.pek_cert, anonce)?;
+        xor_with_anonce(&mut self.sn, anonce)?;
 
-        let mut anonce_array = [0u8; 4];
-        anonce_array[..].copy_from_slice(&anonce.to_le_bytes());
+        // reset reserved to 0.
+        self.reserved.fill(0);
 
-        for (index, item) in mnonce.iter().enumerate() {
-            real_mnonce.push(item ^ anonce_array[index % 4]);
-        }
-
-        real_mnonce
+        Ok(())
     }
 }
 
