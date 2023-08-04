@@ -4,6 +4,11 @@
 //
 
 use crate::error::*;
+use crate::{
+    certs::{Verifiable, Usage, csv::Certificate},
+    crypto::{PublicKey, sig::ecdsa, Signature},
+    util::*,
+};
 
 use openssl::{
     hash::{Hasher, MessageDigest},
@@ -15,6 +20,7 @@ use static_assertions::const_assert;
 
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
+use std::io::Write;
 
 /// Data provieded by the guest owner for requesting an attestation report
 /// from the HYGON Secure Processor.
@@ -96,11 +102,9 @@ impl Default for ReportRsp {
     }
 }
 
-/// Data provieded by the guest owner for requesting an attestation report
-/// from the HYGON Secure Processor.
 #[repr(C)]
-#[derive(Serialize, Deserialize)]
-pub struct AttestationReport {
+#[derive(Copy, Clone, Serialize, Deserialize)]
+pub struct Body {
     pub user_pubkey_digest: [u8; 32],
     pub vm_id: [u8; 16],
     pub vm_version: [u8; 16],
@@ -109,14 +113,9 @@ pub struct AttestationReport {
     pub mnonce: [u8; 16],
     pub measure: [u8; 32],
     pub policy: u32,
-    pub sig_usage: u32,
-    pub sig_algo: u32,
-    pub anonce: u32,
-    #[serde(with = "BigArray")]
-    pub sig: [u8; 144],
 }
 
-impl Default for AttestationReport {
+impl Default for Body {
     fn default() -> Self {
         Self {
             user_pubkey_digest: Default::default(),
@@ -126,11 +125,64 @@ impl Default for AttestationReport {
             mnonce: Default::default(),
             measure: Default::default(),
             policy: Default::default(),
+        }
+    }
+}
+
+/// Data provieded by the guest owner for requesting an attestation report
+/// from the HYGON Secure Processor.
+#[repr(C)]
+#[derive(Serialize, Deserialize)]
+pub struct AttestationReport {
+    pub body: Body,
+    pub sig_usage: u32,
+    pub sig_algo: u32,
+    pub anonce: u32,
+    pub sig: ecdsa::Signature,
+}
+
+impl Default for AttestationReport {
+    fn default() -> Self {
+        Self {
+            body: Default::default(),
             sig_usage: Default::default(),
             sig_algo: Default::default(),
             anonce: Default::default(),
-            sig: [0u8; 144],
+            sig: Default::default(),
         }
+    }
+}
+
+impl codicon::Encoder<crate::Body> for AttestationReport {
+    type Error = std::io::Error;
+
+    fn encode(&self, mut writer: impl Write, _: crate::Body) -> Result<(), std::io::Error> {
+        writer.save(&self.body)
+    }
+}
+
+impl TryFrom<&AttestationReport> for Signature {
+    type Error = std::io::Error;
+
+    #[inline]
+    fn try_from(value: &AttestationReport) -> Result<Self, std::io::Error> {
+        let sig = Vec::try_from(&value.sig)?;
+        Ok(Self {
+            sig,
+            id: None,
+            usage: Usage::PEK.into(),
+            algo: None,
+        })
+    }
+}
+
+impl Verifiable for (&Certificate, &AttestationReport) {
+    type Output = ();
+
+    fn verify(self) -> Result<(), std::io::Error> {
+        let key: PublicKey = self.0.try_into()?;
+        let sig: Signature = self.1.try_into()?;
+        key.verify(self.1, &self.0.body.data.user_id[..self.0.body.data.uid_size as usize], &sig)
     }
 }
 

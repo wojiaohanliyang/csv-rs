@@ -5,7 +5,7 @@
 //! Operations that can be done on a Certificate Authority chain.
 
 use crate::{
-    certs::{Verifiable, Usage},
+    certs::{Verifiable, Usage, Algorithm},
     crypto::{PublicKey, key::ecc, sig::ecdsa, Signature},
     util::*,
 };
@@ -48,6 +48,8 @@ pub struct Body {
 pub struct  Certificate {
     pub body: Body,
     signature: ecdsa::Signature,
+    #[serde(with = "BigArray")]
+    _reserved: [u8; 112],
 }
 
 impl TryFrom<&Certificate> for Signature {
@@ -75,7 +77,7 @@ impl TryFrom<&Certificate> for PublicKey {
             id: Some(value.body.preamble.data.kid),
             key,
             usage: value.body.preamble.data.usage,
-            algo: None,
+            algo: Some(Algorithm::SM2_DA.into()),
         })
     }
 }
@@ -87,6 +89,7 @@ impl codicon::Decoder<()> for Certificate {
         Ok(Self {
             body: reader.load()?,
             signature: reader.load()?,
+            _reserved: reader.load()?,
         })
     }
 }

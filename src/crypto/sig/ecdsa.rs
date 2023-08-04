@@ -8,8 +8,6 @@ use serde_big_array::BigArray;
 use std::io::{Error, Result};
 use crate::util::*;
 
-const SIG_PIECE_SIZE: usize = std::mem::size_of::<[u8; 72]>();
-
 /// The Raw format of ecdsa signature.
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Deserialize, Serialize)]
@@ -18,8 +16,6 @@ pub struct Signature {
     r: [u8; 72],
     #[serde(with = "BigArray")]
     s: [u8; 72],
-    #[serde(with = "BigArray")]
-    _reserved: [u8; 256 - (SIG_PIECE_SIZE) * 2],
 }
 
 impl TryFrom<&Signature> for ecdsa::EcdsaSig {
@@ -39,5 +35,14 @@ impl  TryFrom<&Signature> for Vec<u8> {
     #[inline]
     fn try_from(value: &Signature) -> Result<Self> {
         Ok(ecdsa::EcdsaSig::try_from(value)?.to_der()?)
+    }
+}
+
+impl Default for Signature {
+    fn default() -> Self {
+        Self {
+            r: [0u8; 72],
+            s: [0u8; 72],
+        }
     }
 }

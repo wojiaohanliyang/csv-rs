@@ -47,7 +47,7 @@ pub struct Signatures {
     algo: Algorithm,
     signature: ecdsa::Signature,
     #[serde(with = "BigArray")]
-    _reserved: [u8; 256],
+    _reserved: [u8; 368],
 }
 
 #[repr(C)]
@@ -141,7 +141,7 @@ impl codicon::Decoder<()> for Signatures {
 
     #[inline]
     fn decode(mut reader: impl Read, _: ()) -> Result<Self> {
-        let mut _reserved = [0u8; 256];
+        let mut _reserved = [0u8; 368];
         let usage: Usage = reader.load()?;
         let algo: Algorithm = reader.load()?;
         let signature: ecdsa::Signature = reader.load()?;

@@ -27,7 +27,6 @@ pub trait TypeLoad: Read {
         #[allow(clippy::uninit_assumed_init)]
         let mut t = unsafe { MaybeUninit::uninit().assume_init() };
         let p = &mut t as *mut T as *mut u8;
-        println!("sizeof load is {}", size_of::<T>());
         let s = unsafe { from_raw_parts_mut(p, size_of::<T>()) };
         self.read_exact(s)?;
         Ok(t)

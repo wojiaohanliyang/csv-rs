@@ -61,7 +61,7 @@ impl CsvGuest {
 
         CSV_GET_REPORT.ioctl(&mut self.0, &mut guest_report_request)?;
 
-        report_response.signer.verify(&mnonce_value, &report_response.report.mnonce, &report_response.report.anonce)?;
+        report_response.signer.verify(&mnonce_value, &report_response.report.body.mnonce, &report_response.report.anonce)?;
 
         Ok((report_response.report, report_response.signer))
     }

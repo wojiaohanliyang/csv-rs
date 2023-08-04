@@ -47,6 +47,18 @@ impl Usage {
     pub const CEK: Usage = Usage(0x1004u32.to_le());
 }
 
+impl Default for Usage {
+    fn default() -> Self {
+        Usage(0)
+    }
+}
+
+impl From<u32> for Usage {
+    fn from(value: u32) -> Self {
+        Self(value.to_le())
+    }
+}
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Algorithm(u32);
@@ -54,4 +66,16 @@ pub struct Algorithm(u32);
 impl Algorithm {
     pub const SM2_DA: Algorithm = Algorithm(0x0004u32.to_le());
     pub const SM2_DH: Algorithm = Algorithm(0x0005u32.to_le());
+}
+
+impl Default for Algorithm {
+    fn default() -> Self {
+        Algorithm(0)
+    }
+}
+
+impl From<u32> for Algorithm {
+    fn from(value: u32) -> Self {
+        Self(value.to_le())
+    }
 }
