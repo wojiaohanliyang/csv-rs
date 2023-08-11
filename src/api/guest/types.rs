@@ -22,6 +22,8 @@ use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use std::io::Write;
 
+use bitfield::bitfield;
+
 /// Data provieded by the guest owner for requesting an attestation report
 /// from the HYGON Secure Processor.
 #[repr(C)]
@@ -103,7 +105,7 @@ impl Default for ReportRsp {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Body {
     pub user_pubkey_digest: [u8; 32],
     pub vm_id: [u8; 16],
@@ -112,7 +114,7 @@ pub struct Body {
     pub report_data: [u8; 64],
     pub mnonce: [u8; 16],
     pub measure: [u8; 32],
-    pub policy: u32,
+    pub policy: GuestPolicy,
 }
 
 impl Default for Body {
@@ -132,7 +134,7 @@ impl Default for Body {
 /// Data provieded by the guest owner for requesting an attestation report
 /// from the HYGON Secure Processor.
 #[repr(C)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AttestationReport {
     pub body: Body,
     pub sig_usage: u32,
@@ -183,6 +185,54 @@ impl Verifiable for (&Certificate, &AttestationReport) {
         let key: PublicKey = self.0.try_into()?;
         let sig: Signature = self.1.try_into()?;
         key.verify(self.1, &self.0.body.data.user_id[..self.0.body.data.uid_size as usize], &sig)
+    }
+}
+
+bitfield! {
+    /// The firmware associates each guest with a guest policy that the guest owner provides. The
+    /// firmware restricts what actions the hypervisor can take on the guest according to the guest policy.
+    /// The policy also indicates the minimum firmware version to for the guest.
+    ///
+    /// The guest owner provides the guest policy to the firmware during launch. The firmware then binds
+    /// the policy to the guest. The policy cannot be changed throughout the lifetime of the guest. The
+    /// policy is also migrated with the guest and enforced by the destination platform firmware.
+    ///
+    /// | Bit(s) | Name           | Description                                                                                 >
+    /// |--------|----------------|--------------------------------------------------------------------------------------------->
+    /// | 0      | NODBG          | Debugging of the guest is disallowed when set                                               >
+    /// | 1      | NOKS           | Sharing keys with other guests is disallowed when set                                       >
+    /// | 2      | ES             | CSV2 is required when set                                                                   >
+    /// | 3      | NOSEND         | Sending the guest to another platform is disallowed when set                                >
+    /// | 4      | DOMAIN         | The guest must not be transmitted to another platform that is not in the domain when set.   >
+    /// | 5      | CSV            | The guest must not be transmitted to another platform that is not CSV capable when set.     >
+    /// | 6      | CSV3           | The guest must not be transmitted to another platform that is not CSV3 capable when set.    >
+    /// | 7      | ASID_REUSE     | Sharing asids with other guests owned by same user is allowed when set                      >
+    /// | 11:8   | HSK_VERSION    | The guest must not be transmitted to another platform with a lower HSK version.             >
+    /// | 15:12  | CEK_VERSION    | The guest must not be transmitted to another platform with a lower CEK version.             >
+    /// | 23:16  | API_MAJOR      | The guest must not be transmitted to another platform with a lower platform version.        >
+    /// | 31:24  | API_MINOR      | The guest must not be transmitted to another platform with a lower platform version.        >
+    #[repr(C)]
+    #[derive(Copy, Clone, Serialize, Deserialize, Default)]
+    pub struct GuestPolicy(u32);
+    impl Debug;
+    pub nodbg, _: 0, 0;
+    pub noks, _: 1, 1;
+    pub es, _: 2, 2;
+    pub nosend, _: 3, 3;
+    pub domain, _: 4, 4;
+    pub csv, _: 5, 5;
+    pub csv3, _: 6, 6;
+    pub asid_reuse, _: 7, 7;
+    pub hsk_version, _: 11, 8;
+    pub cek_version, _: 15, 12;
+    pub api_major, _: 23, 16;
+    pub api_minor, _: 31, 24;
+}
+
+impl GuestPolicy {
+    #[allow(dead_code)]
+    pub fn xor(&self, anonce: &u32) -> Self {
+        Self(self.0 ^ anonce)
     }
 }
 
