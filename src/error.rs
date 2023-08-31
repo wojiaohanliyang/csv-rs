@@ -1,15 +1,14 @@
-
 // Copyright (C) Hygon Info Technologies Ltd.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::io;
 use openssl::error::ErrorStack;
+use std::io;
 
 #[derive(Debug)]
 pub enum Error {
-    /// Something went wrong when communicating with 
+    /// Something went wrong when communicating with
     /// kernel or CSV platform
     IoError(io::Error),
 
@@ -29,7 +28,7 @@ impl From<io::Error> for Error {
 
 impl From<ErrorStack> for Error {
     #[inline]
-    fn from(error:ErrorStack) -> Error {
+    fn from(error: ErrorStack) -> Error {
         Error::IoError(io::Error::from(error))
     }
 }

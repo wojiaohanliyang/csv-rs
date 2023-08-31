@@ -8,12 +8,12 @@ pub(crate) mod key;
 pub(crate) mod sig;
 pub(crate) mod sm;
 
-use std::io::{Error, ErrorKind, Result};
 use crate::{
-    certs::{Usage, Algorithm},
-    Body,
+    certs::{Algorithm, Usage},
     crypto::key::ecc,
+    Body,
 };
+use std::io::{Error, ErrorKind, Result};
 
 #[derive(Debug)]
 pub struct Signature {
@@ -31,9 +31,8 @@ pub struct PublicKey {
     pub usage: Usage,
 }
 
-impl PublicKey
-{
-    pub fn verify (
+impl PublicKey {
+    pub fn verify(
         &self,
         msg: &impl codicon::Encoder<Body, Error = Error>,
         uid: &[u8],
@@ -48,8 +47,7 @@ impl PublicKey
 
         let mut buf: Vec<u8> = Vec::new();
         msg.encode(&mut buf, Body)?;
-        sm::SM2::verify(self.key, &sig.sig, &Vec::from(uid),
-            &buf).map(|ok| {
+        sm::SM2::verify(self.key, &sig.sig, &Vec::from(uid), &buf).map(|ok| {
             // SM2 verify will return Ok(true) if the signature
             // is verified and Ok(false) if not. This patches the result
             // to return Err if SM2 returns Ok(false).
@@ -61,4 +59,3 @@ impl PublicKey
         })?
     }
 }
-

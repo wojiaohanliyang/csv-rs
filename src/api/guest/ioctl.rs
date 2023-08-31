@@ -14,7 +14,7 @@ pub enum CsvGuestIoctl {
 
 const CSV: Group = Group::new(b'D');
 
-pub const CSV_GET_REPORT: Ioctl<WriteRead, &GuestReportRequest<>> =
+pub const CSV_GET_REPORT: Ioctl<WriteRead, &GuestReportRequest> =
     unsafe { CSV.write_read(CsvGuestIoctl::GetReport as u8) };
 
 /// The structure used for making guest report request to the PSP as a guest owner.
@@ -32,7 +32,7 @@ pub struct GuestReportRequest<'a> {
 
 impl<'a> GuestReportRequest<'a> {
     /// Creates a new report request from the adresses provided.
-    pub fn new(data: &'a [u8] ) -> Self {
+    pub fn new(data: &'a [u8]) -> Self {
         Self {
             addr: data.as_ptr() as _,
             len: data.len() as _,

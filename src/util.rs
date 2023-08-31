@@ -4,9 +4,9 @@
 //
 
 use std::{
-    io::{Write, Result, Read},
-    slice::{from_raw_parts, from_raw_parts_mut},
+    io::{Read, Result, Write},
     mem::{size_of, MaybeUninit},
+    slice::{from_raw_parts, from_raw_parts_mut},
 };
 
 pub trait FromLe: Sized {

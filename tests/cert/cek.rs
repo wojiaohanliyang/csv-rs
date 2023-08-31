@@ -4,8 +4,8 @@
 //
 
 use super::*;
-use csv_rs::certs::{ca, csv, Verifiable};
 use codicon::Decoder;
+use csv_rs::certs::{ca, csv, Verifiable};
 
 #[test]
 fn verify() {

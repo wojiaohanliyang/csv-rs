@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use std::io::{Error, ErrorKind, Result};
 use openssl::{ec, nid};
 use serde::{Deserialize, Serialize};
+use std::io::{Error, ErrorKind, Result};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]

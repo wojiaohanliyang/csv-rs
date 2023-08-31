@@ -7,9 +7,9 @@ use crate::error::*;
 mod ioctl;
 pub use ioctl::*;
 mod types;
-pub use types::*;
-use std::fs::{File, OpenOptions};
 use rand::Rng;
+use std::fs::{File, OpenOptions};
+pub use types::*;
 
 /// A handle to the CSV guest device.
 pub struct CsvGuest(File);
@@ -17,9 +17,7 @@ pub struct CsvGuest(File);
 impl CsvGuest {
     /// Generate a handle to the CSV guest platform via `/dev/csv-guest`.
     pub fn open() -> std::io::Result<CsvGuest> {
-        let file = OpenOptions::new()
-            .read(true)
-            .open("/dev/csv-guest")?;
+        let file = OpenOptions::new().read(true).open("/dev/csv-guest")?;
         Ok(CsvGuest(file))
     }
 
@@ -61,7 +59,11 @@ impl CsvGuest {
 
         CSV_GET_REPORT.ioctl(&mut self.0, &mut guest_report_request)?;
 
-        report_response.signer.verify(&mnonce_value, &report_response.report.body.mnonce, &report_response.report.anonce)?;
+        report_response.signer.verify(
+            &mnonce_value,
+            &report_response.report.body.mnonce,
+            &report_response.report.anonce,
+        )?;
 
         Ok((report_response.report, report_response.signer))
     }

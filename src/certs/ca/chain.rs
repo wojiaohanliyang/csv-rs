@@ -15,5 +15,3 @@ pub struct Chain {
     /// The HYGON Root Key certificate.
     pub hrk: Certificate,
 }
-
-

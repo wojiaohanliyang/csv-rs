@@ -4,14 +4,11 @@
 
 //! Interfaces for ecc keys.
 
-use openssl::{ec, bn, pkey};
-use crate::{
-    crypto::key::group::Group,
-    util::*,
-};
-use std::io::{Error, Result};
+use crate::{crypto::key::group::Group, util::*};
+use openssl::{bn, ec, pkey};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
+use std::io::{Error, Result};
 
 /// The Raw format of ecc pubkey.
 #[repr(C)]

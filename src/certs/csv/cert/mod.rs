@@ -5,13 +5,13 @@
 //! Operations that can be done on a CSV certificate.
 
 use crate::{
-    certs::{Verifiable, ca, Usage, Algorithm},
-    crypto::{PublicKey, key::ecc, sig::ecdsa, Signature},
+    certs::{ca, Algorithm, Usage, Verifiable},
+    crypto::{key::ecc, sig::ecdsa, PublicKey, Signature},
     util::*,
 };
-use std::io::{Error, ErrorKind, Result, Write, Read};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
+use std::io::{Error, ErrorKind, Read, Result, Write};
 
 #[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct Pubkey {
@@ -52,7 +52,7 @@ pub struct Signatures {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Deserialize, Serialize)]
-pub struct  Certificate {
+pub struct Certificate {
     pub body: Body,
     pub sigs: [Signatures; 2],
 }
@@ -73,7 +73,7 @@ impl TryFrom<&Signatures> for Option<Signature> {
             sig,
             usage,
             algo: Some(algo),
-            id : None,
+            id: None,
         }))
     }
 }
@@ -83,10 +83,7 @@ impl TryFrom<&Certificate> for [Option<Signature>; 2] {
 
     #[inline]
     fn try_from(value: &Certificate) -> Result<Self> {
-        Ok([
-            (&value.sigs[0]).try_into()?,
-            (&value.sigs[1]).try_into()?,
-        ])
+        Ok([(&value.sigs[0]).try_into()?, (&value.sigs[1]).try_into()?])
     }
 }
 
@@ -112,7 +109,14 @@ impl Verifiable for (&Certificate, &Certificate) {
 
         let sigs: [Option<Signature>; 2] = self.1.try_into()?;
         for sig in sigs.iter().flatten() {
-            if key.verify(self.1, &self.0.body.data.user_id[..self.0.body.data.uid_size as usize], sig).is_ok() {
+            if key
+                .verify(
+                    self.1,
+                    &self.0.body.data.user_id[..self.0.body.data.uid_size as usize],
+                    sig,
+                )
+                .is_ok()
+            {
                 return Ok(());
             }
         }
@@ -128,7 +132,14 @@ impl Verifiable for (&ca::cert::Certificate, &Certificate) {
         let key: PublicKey = self.0.try_into()?;
         let sigs: [Option<Signature>; 2] = self.1.try_into()?;
         for sig in sigs.iter().flatten() {
-            if key.verify(self.1, &self.0.body.user_id[..self.0.body.uid_size as usize], sig).is_ok() {
+            if key
+                .verify(
+                    self.1,
+                    &self.0.body.user_id[..self.0.body.uid_size as usize],
+                    sig,
+                )
+                .is_ok()
+            {
                 return Ok(());
             }
         }
@@ -159,7 +170,7 @@ impl codicon::Decoder<()> for Certificate {
     type Error = Error;
 
     fn decode(mut reader: impl Read, _: ()) -> Result<Self> {
-        let body:Body = reader.load()?;
+        let body: Body = reader.load()?;
         let sig1 = Signatures::decode(&mut reader, ())?;
         let sig2 = Signatures::decode(&mut reader, ())?;
         Ok(Self {
@@ -181,10 +192,7 @@ impl Signatures {
     pub fn is_empty(&self) -> bool {
         match self.usage {
             Usage::CEK | Usage::HRK | Usage::HSK | Usage::OCA | Usage::PDH | Usage::PEK => {
-                !matches!(
-                    self.algo,
-                    Algorithm::SM2_DA | Algorithm::SM2_DH
-                )
+                !matches!(self.algo, Algorithm::SM2_DA | Algorithm::SM2_DH)
             }
             _ => true,
         }
