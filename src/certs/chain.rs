@@ -13,7 +13,7 @@ use crate::certs::csv;
 pub struct Chain {
     /// The Certificate Authority chain
     pub ca: ca::Chain,
-    
+
     /// The CSV platform chain.
     pub csv: csv::Chain,
 }

@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use openssl::{ecdsa, bn};
+use crate::util::*;
+use openssl::{bn, ecdsa};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use std::io::{Error, Result};
-use crate::util::*;
 
 /// The Raw format of ecdsa signature.
 #[repr(C)]
@@ -29,7 +29,7 @@ impl TryFrom<&Signature> for ecdsa::EcdsaSig {
     }
 }
 
-impl  TryFrom<&Signature> for Vec<u8> {
+impl TryFrom<&Signature> for Vec<u8> {
     type Error = Error;
 
     #[inline]

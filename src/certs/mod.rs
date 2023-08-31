@@ -4,13 +4,13 @@
 
 //! Everything needed for working with HYGON CSV certificate chains.
 
-pub mod ca;
-pub mod csv;
 pub mod builtin;
+pub mod ca;
 mod chain;
+pub mod csv;
 
-use std::io::{Result};
 use serde::{Deserialize, Serialize};
+use std::io::Result;
 
 /// An interface for types that may containe entities
 /// such as signatures that must be verified.

@@ -5,14 +5,14 @@
 //! Operations that can be done on a Certificate Authority chain.
 
 use crate::{
-    certs::{Verifiable, Usage, Algorithm},
-    crypto::{PublicKey, key::ecc, sig::ecdsa, Signature},
+    certs::{Algorithm, Usage, Verifiable},
+    crypto::{key::ecc, sig::ecdsa, PublicKey, Signature},
     util::*,
 };
 
-use std::io::{Error, Result, Write, Read};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
+use std::io::{Error, Read, Result, Write};
 
 #[repr(C)]
 #[derive(Copy, Clone, Serialize, Deserialize)]
@@ -45,7 +45,7 @@ pub struct Body {
 /// A Certificate Authority chain.
 #[repr(C)]
 #[derive(Copy, Clone, Serialize, Deserialize)]
-pub struct  Certificate {
+pub struct Certificate {
     pub body: Body,
     signature: ecdsa::Signature,
     #[serde(with = "BigArray")]
@@ -108,6 +108,10 @@ impl Verifiable for (&Certificate, &Certificate) {
     fn verify(self) -> Result<()> {
         let key: PublicKey = self.0.try_into()?;
         let sig: Signature = self.1.try_into()?;
-        key.verify(self.1, &self.0.body.user_id[..self.0.body.uid_size as usize], &sig)
+        key.verify(
+            self.1,
+            &self.0.body.user_id[..self.0.body.uid_size as usize],
+            &sig,
+        )
     }
 }

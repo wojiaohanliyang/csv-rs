@@ -27,7 +27,7 @@ pub struct Version {
     pub major: u8,
 
     /// The minor version number.
-    pub minor:u8,
+    pub minor: u8,
 }
 
 pub struct Body;

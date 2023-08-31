@@ -6,5 +6,5 @@
 
 pub(crate) mod cert;
 mod chain;
-pub use chain::Chain;
 pub use cert::Certificate;
+pub use chain::Chain;
