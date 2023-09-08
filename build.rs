@@ -15,7 +15,7 @@ fn main() {
         match version {
             v if v < 0x1_01_01_00_0 => panic!("Unsupported openssl version:{}", version),
             v if v < 0x3_00_00_00_0 => println!("cargo:rustc-cfg=ossl111"),
-            v if v < 0x3_01_00_00_0 => println!("cargo:rustc-cfg=ossl300"),
+            v if v < 0x3_02_00_00_0 => println!("cargo:rustc-cfg=ossl300"),
             _ => panic!("Unsupported openssl version:{}", version),
         }
     }
