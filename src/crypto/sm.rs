@@ -5,6 +5,7 @@
 //! Interfaces for GuoMi that is not supported on rust-openssl.
 
 use crate::crypto::key::ecc;
+use libc::*;
 use openssl_sys::*;
 use std::{
     io::{Error, ErrorKind, Result},
