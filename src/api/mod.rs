@@ -6,3 +6,4 @@
 //! Rust-fridenly API wrappers to communicate the the FFI functions.
 
 pub mod guest;
+pub mod platform;
