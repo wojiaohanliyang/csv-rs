@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use std::io::{Error, ErrorKind, Read, Result, Write};
 
+#[repr(C)]
 #[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct Pubkey {
     pub usage: Usage,
@@ -41,6 +42,7 @@ pub struct Body {
     pub data: Data,
 }
 
+#[repr(C)]
 #[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct Signatures {
     usage: Usage,
@@ -185,6 +187,14 @@ impl codicon::Encoder<crate::Body> for Certificate {
 
     fn encode(&self, mut writer: impl Write, _: crate::Body) -> Result<()> {
         writer.save(&self.body)
+    }
+}
+
+impl TryFrom<&Certificate> for Usage {
+    type Error = Error;
+
+    fn try_from(value: &Certificate) -> Result<Self> {
+        Ok(value.body.data.pubkey.usage)
     }
 }
 

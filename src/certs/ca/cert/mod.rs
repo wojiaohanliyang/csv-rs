@@ -82,6 +82,14 @@ impl TryFrom<&Certificate> for PublicKey {
     }
 }
 
+impl TryFrom<&Certificate> for Usage {
+    type Error = Error;
+
+    fn try_from(value: &Certificate) -> Result<Self> {
+        Ok(value.body.preamble.data.usage)
+    }
+}
+
 impl codicon::Decoder<()> for Certificate {
     type Error = Error;
 

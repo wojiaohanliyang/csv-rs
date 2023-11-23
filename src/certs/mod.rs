@@ -10,7 +10,12 @@ mod chain;
 pub mod csv;
 
 use serde::{Deserialize, Serialize};
-use std::io::Result;
+use std::{
+    convert::*,
+    io::{Error, ErrorKind, Read, Result, Write},
+};
+
+pub use chain::Chain;
 
 /// An interface for types that may containe entities
 /// such as signatures that must be verified.
@@ -20,6 +25,15 @@ pub trait Verifiable {
 
     /// Self-verifies signatures.
     fn verify(self) -> Result<Self::Output>;
+}
+
+/// An interface for types that can sign another type (i.e., a certificate).
+pub trait Signer<T> {
+    /// The now-signed type.
+    type Output;
+
+    /// Signs the target.
+    fn sign(&self, target: &mut T) -> Result<Self::Output>;
 }
 
 /// Denotes a certificate's usage.

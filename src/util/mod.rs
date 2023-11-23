@@ -1,7 +1,11 @@
 // Copyright (C) Hygon Info Technologies Ltd.
 //
 // SPDX-License-Identifier: Apache-2.0
-//
+
+//! Helpful primitives for developing the crate.
+
+mod impl_const_id;
+pub mod cached_chain;
 
 use std::{
     io::{Read, Result, Write},

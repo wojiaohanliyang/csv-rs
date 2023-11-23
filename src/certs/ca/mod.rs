@@ -4,6 +4,7 @@
 
 //! For operating on Certificate Authority chains.
 
+use super::*;
 pub(crate) mod cert;
 mod chain;
 pub use cert::Certificate;
