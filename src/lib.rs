@@ -32,6 +32,21 @@ pub struct Version {
     pub minor: u8,
 }
 
+impl std::fmt::Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}.{}", self.major, self.minor)
+    }
+}
+
+impl From<u16> for Version {
+    fn from(v: u16) -> Self {
+        Self {
+            major: ((v & 0xF0) >> 4) as u8,
+            minor: (v & 0x0F) as u8,
+        }
+    }
+}
+
 /// A description of the CSV platform's build information.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
