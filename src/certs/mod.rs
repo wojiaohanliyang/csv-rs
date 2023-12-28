@@ -17,6 +17,8 @@ use std::{
 
 pub use chain::Chain;
 
+use openssl::hash;
+
 /// An interface for types that may containe entities
 /// such as signatures that must be verified.
 pub trait Verifiable {
@@ -33,7 +35,7 @@ pub trait Signer<T> {
     type Output;
 
     /// Signs the target.
-    fn sign(&self, target: &mut T) -> Result<Self::Output>;
+    fn sign(&self, target: &mut T, uid: String) -> Result<Self::Output>;
 }
 
 /// Denotes a certificate's usage.
@@ -59,6 +61,8 @@ impl Usage {
 
     /// Chip Endorsement Key.
     pub const CEK: Usage = Usage(0x1004u32.to_le());
+
+    const INV: Usage = Usage(0x1000u32.to_le());
 }
 
 impl Default for Usage {
@@ -73,13 +77,45 @@ impl From<u32> for Usage {
     }
 }
 
+impl TryFrom<Usage> for String {
+    type Error = Error;
+
+    fn try_from(value: Usage) -> Result<Self> {
+        match value {
+            Usage::HRK => Ok(String::from("HYGON-SSD-HRK")),
+            Usage::HSK => Ok(String::from("HYGON-SSD-HSK")),
+            Usage::OCA => Ok(String::from("HYGON-SSD-OCA")),
+            Usage::PEK => Ok(String::from("HYGON-SSD-PEK")),
+            Usage::PDH => Ok(String::from("HYGON-SSD-PDH")),
+            Usage::CEK => Ok(String::from("HYGON-SSD-CEK")),
+
+            _ => Err(ErrorKind::InvalidInput.into()),
+        }
+    }
+}
+
+impl TryFrom<Usage> for Algorithm {
+    type Error = Error;
+
+    fn try_from(value: Usage) -> Result<Self> {
+        match value {
+            Usage::PDH => Ok(Algorithm::SM2_DH),
+            Usage::HRK | Usage::HSK | Usage::OCA | Usage::PEK | Usage::CEK =>
+                Ok(Algorithm::SM2_SA),
+
+            _ => Err(ErrorKind::InvalidInput.into()),
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Algorithm(u32);
 
 impl Algorithm {
-    pub const SM2_DA: Algorithm = Algorithm(0x0004u32.to_le());
+    pub const SM2_SA: Algorithm = Algorithm(0x0004u32.to_le());
     pub const SM2_DH: Algorithm = Algorithm(0x0005u32.to_le());
+    pub const NONE: Algorithm = Algorithm(0x0000u32.to_le());
 }
 
 impl Default for Algorithm {
@@ -91,5 +127,19 @@ impl Default for Algorithm {
 impl From<u32> for Algorithm {
     fn from(value: u32) -> Self {
         Self(value.to_le())
+    }
+}
+
+impl TryFrom<Algorithm> for hash::MessageDigest {
+    type Error = Error;
+
+    fn try_from(value: Algorithm) -> Result<Self> {
+        match value {
+            Algorithm::SM2_SA | Algorithm::SM2_DH => {
+                Ok(hash::MessageDigest::sm3())
+            }
+
+            _ => Err(ErrorKind::InvalidInput.into()),
+        }
     }
 }

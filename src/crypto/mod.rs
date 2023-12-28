@@ -4,9 +4,9 @@
 
 //! Interfaces for cryptography.
 
-pub(crate) mod key;
+pub mod key;
 pub(crate) mod sig;
-pub(crate) mod sm;
+pub mod sm;
 
 use crate::{
     certs::{Algorithm, Usage},
@@ -14,6 +14,8 @@ use crate::{
     Body,
 };
 use std::io::{Error, ErrorKind, Result};
+use openssl::hash;
+use openssl_sys::EC_KEY;
 
 #[derive(Debug)]
 pub struct Signature {
@@ -21,6 +23,14 @@ pub struct Signature {
     pub sig: Vec<u8>,
     pub algo: Option<Algorithm>,
     pub usage: Usage,
+}
+
+/// Represents a private key.
+pub struct PrivateKey<U> {
+    pub id: Option<[u8; 16]>,
+    pub key: * mut EC_KEY,
+    pub hash: hash::MessageDigest,
+    pub usage: U,
 }
 
 #[derive(Debug)]
@@ -57,5 +67,12 @@ impl PublicKey {
                 Err(ErrorKind::NotFound.into())
             }
         })?
+    }
+
+    pub fn encrypt(
+        &self,
+        data: &[u8],
+    ) -> Result<Vec<u8>> {
+        sm::SM2::encrypt(&data, self.key)
     }
 }

@@ -10,12 +10,31 @@ use std::io::{Error, Result};
 
 /// The Raw format of ecdsa signature.
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Deserialize, Serialize)]
 pub struct Signature {
     #[serde(with = "BigArray")]
-    r: [u8; 72],
+    pub r: [u8; 72],
     #[serde(with = "BigArray")]
-    s: [u8; 72],
+    pub s: [u8; 72],
+}
+
+impl From<ecdsa::EcdsaSig> for Signature {
+    #[inline]
+    fn from(value: ecdsa::EcdsaSig) -> Self {
+        Signature {
+            r: value.r().as_le_bytes(),
+            s: value.s().as_le_bytes(),
+        }
+    }
+}
+
+impl TryFrom<&[u8]> for Signature {
+    type Error = Error;
+
+    #[inline]
+    fn try_from(value: &[u8]) -> Result<Self> {
+        Ok(ecdsa::EcdsaSig::from_der(value)?.into())
+    }
 }
 
 impl TryFrom<&Signature> for ecdsa::EcdsaSig {

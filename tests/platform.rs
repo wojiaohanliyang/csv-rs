@@ -30,12 +30,13 @@ mod csv {
     fn platform_status() {
         let mut fw = Firmware::open().unwrap();
         let status = fw.platform_status().unwrap();
+        println!("{:?}", status.build);
         assert!(
             status.build
                 > Build {
                     version: Version {
-                        major: 0,
-                        minor: 14
+                        major: 1,
+                        minor: 2
                     },
                     ..Default::default()
                 }
@@ -84,8 +85,6 @@ mod csv {
         chain.verify().unwrap();
     }
 
-    /* TODO: open it after Certificate::generate is support.
-     *
     #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
     #[test]
     #[serial]
@@ -94,22 +93,22 @@ mod csv {
 
         let mut fw = Firmware::open().unwrap();
 
-        let (mut oca, key) = Certificate::generate(Usage::OCA).unwrap();
-        key.sign(&mut oca).unwrap();
+        let (mut oca, key) = Certificate::generate(Usage::OCA, None).unwrap();
+        let uid = String::try_from(key.usage).unwrap();
+        key.sign(&mut oca, uid.clone()).unwrap();
 
         let mut pek = fw.pek_csr().unwrap();
-        key.sign(&mut pek).unwrap();
+        key.sign(&mut pek, uid.clone()).unwrap();
 
         fw.pek_cert_import(&pek, &oca).unwrap();
 
         let chain = fw.pdh_cert_export().unwrap();
-        assert_eq!(oca, chain.oca);
+        // TODO: open it after eq is implement
+        //assert_eq!(oca, chain.oca);
         chain.verify().unwrap();
 
         fw.platform_reset().unwrap();
     }
-     *
-     */
 
      #[cfg_attr(not(has_dev_sev), ignore)]
     #[test]

@@ -5,4 +5,4 @@
 //! Interfaces for public and private keys.
 
 pub(crate) mod ecc;
-pub(crate) mod group;
+pub mod group;

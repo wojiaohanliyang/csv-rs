@@ -77,7 +77,7 @@ impl TryFrom<&Certificate> for PublicKey {
             id: Some(value.body.preamble.data.kid),
             key,
             usage: value.body.preamble.data.usage,
-            algo: Some(Algorithm::SM2_DA.into()),
+            algo: Some(Algorithm::SM2_SA.into()),
         })
     }
 }

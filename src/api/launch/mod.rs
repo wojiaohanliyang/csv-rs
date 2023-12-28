@@ -8,10 +8,18 @@
 pub(crate) mod ioctl;
 use ioctl::*;
 
-use crate::*;
-use crate::util::*;
+pub(crate) mod types;
+use types::*;
+
+use crate::{
+    Version,
+    util::*,
+    certs::{Signer, Usage, Verifiable, csv::Certificate},
+    crypto::{PrivateKey, sm, sig::ecdsa, PublicKey, Signature},
+};
 
 use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 use bitflags::bitflags;
 use std::{
     os::unix::io::AsRawFd,
@@ -96,7 +104,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
     pub fn start_raw(
         mut self,
         policy: &Policy,
-        cert: &crate::certs::csv::Certificate,
+        cert: &Certificate,
         session: &Session,
     ) -> Result<Launcher<Started, U, V>> {
         let mut launch_start = LaunchStart::new(policy, cert, session);
@@ -292,11 +300,10 @@ impl From<u32> for Policy {
     }
 }
 
-/// A secure channel between the tenant and the HYGON Secure
-/// Processor.
+/// the SessionBody of the session
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Session {
+pub struct SessionBody {
     /// Used for deriving a shared secret between the tenant
     /// and the HYGON SP.
     pub nonce: [u8; 16],
@@ -313,8 +320,148 @@ pub struct Session {
     /// `wrap_tk` field of this struct).
     pub wrap_mac: [u8; 32],
 
-    /// The integrity-protected CSV policy.
-    pub policy_mac: [u8; 32],
+    /// The integrity-protected CSV session data.
+    pub session_mac: [u8; 32],
+
+    // following 2 attr are not used, keep it for backward compatibility
+    pub key_id: [u8; 16],
+
+    /// used in random public key convert from command data buffer
+    #[serde(with = "BigArray")]
+    pub rnd_pub_key_data: [u8; 148],
+
+    /// ms_enc
+    #[serde(with = "BigArray")]
+    pub ms_enc: [u8; 256],
+
+    /// vm_digest
+    pub vm_digest: [u8; 32],
+
+    /// pubkey_digest
+    pub pubkey_digest: [u8; 32],
+
+    /// vm_id
+    pub vm_id: [u8; 16],
+
+    /// vm_version
+    pub vm_version: [u8; 16],
+
+    /// user_data
+    #[serde(with = "BigArray")]
+    pub user_data: [u8; 64],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionSig {
+    /// sig R
+    pub r: [u8; 32],
+    /// sig S
+    pub s: [u8; 32],
+}
+
+impl From<ecdsa::Signature> for SessionSig {
+    #[inline]
+    fn from(value: ecdsa::Signature) -> Self {
+        let mut r = [0u8; 32];
+        let mut s = [0u8; 32];
+        for (i, b) in value.r.iter().take(32).cloned().enumerate() {
+            r[i] = b;
+        }
+        for (i, b) in value.s.iter().take(32).cloned().enumerate() {
+            s[i] = b;
+        }
+        SessionSig {
+            r,
+            s,
+        }
+    }
+}
+
+impl From<SessionSig> for ecdsa::Signature{
+    #[inline]
+    fn from(value: SessionSig) -> Self {
+        let mut r = [0u8; 72];
+        let mut s = [0u8; 72];
+        for (i, b) in value.r.iter().cloned().enumerate() {
+            r[i] = b;
+        }
+        for (i, b) in value.s.iter().cloned().enumerate() {
+            s[i] = b;
+        }
+        ecdsa::Signature {
+            r,
+            s,
+        }
+    }
+}
+
+/// A secure channel between the tenant and the HYGON Secure
+/// Processor.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Session {
+    /// Used for deriving a shared secret between the tenant
+    /// and the HYGON SP.
+    pub body : SessionBody,
+    pub sig : SessionSig,
+}
+
+impl Signer<Session> for PrivateKey<Usage> {
+    type Output = ();
+
+    fn sign(&self, target: &mut Session, uid: String) -> Result<()> {
+        let slot = &mut target.sig;
+
+        let mut msg: Vec<u8> = Vec::new();
+        msg.save(&target.body)?;
+
+        let sig = sm::SM2::sign(self.key, &uid.as_bytes().to_vec(), &msg)?;
+
+        let ecdsa_sig = ecdsa::Signature::try_from(&sig[..])?;
+
+        *slot = SessionSig::from(ecdsa_sig);
+        Ok(())
+    }
+}
+
+impl TryFrom<&Session> for Signature {
+    type Error = std::io::Error;
+
+    #[inline]
+    fn try_from(value: &Session) -> Result<Self> {
+        let sig = ecdsa::Signature::from(value.sig);
+
+        let sig = Vec::try_from(&sig)?;
+        Ok(Self {
+            sig,
+            id: None,
+            usage: Usage::PDH.into(),
+            algo: None,
+        })
+    }
+}
+
+impl codicon::Encoder<crate::Body> for Session {
+    type Error = std::io::Error;
+
+    fn encode(&self, mut writer: impl Write, _: crate::Body) -> Result<()> {
+        writer.save(&self.body)
+    }
+}
+
+impl Verifiable for (&Certificate, &Session) {
+    type Output = ();
+
+    fn verify(self) -> Result<()> {
+        let key: PublicKey = self.0.try_into()?;
+        let sig: Signature = self.1.try_into()?;
+        key.verify(
+            self.1,
+            &self.0.body.data.user_id[..self.0.body.data.uid_size as usize],
+            &sig,
+        )
+    }
 }
 
 /// Used to establish a secure session with the HYGON SP.
@@ -325,7 +472,7 @@ pub struct Start {
     pub policy: Policy,
 
     /// The tenant's Diffie-Hellman certificate.
-    pub cert: certs::csv::Certificate,
+    pub cert: Certificate,
 
     /// A secure channel with the HYGON SP.
     pub session: Session,

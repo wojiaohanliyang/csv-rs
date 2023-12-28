@@ -10,14 +10,18 @@ pub mod certs;
 pub mod api;
 
 /// Crypto module for key and signature.
-pub(crate) mod crypto;
+pub mod crypto;
 
 /// Error module.
 pub mod error;
 
+pub mod session;
+
 mod util;
 
 pub use util::cached_chain;
+
+use std::io::Write;
 
 use serde::{Deserialize, Serialize};
 
