@@ -306,7 +306,6 @@ impl From<u32> for Indeterminate<Error> {
     }
 }
 
-
 impl From<Indeterminate<Error>> for io::Error {
     #[inline]
     fn from(indeterminate: Indeterminate<Error>) -> io::Error {

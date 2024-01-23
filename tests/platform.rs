@@ -2,7 +2,7 @@
 
 mod csv {
     use csv_rs::cached_chain;
-    use csv_rs::{certs::Usage, api::platform::Firmware, Build, Version};
+    use csv_rs::{api::platform::Firmware, certs::Usage, Build, Version};
 
     use serial_test::serial;
 
@@ -34,10 +34,7 @@ mod csv {
         assert!(
             status.build
                 > Build {
-                    version: Version {
-                        major: 1,
-                        minor: 2
-                    },
+                    version: Version { major: 1, minor: 2 },
                     ..Default::default()
                 }
         );
@@ -110,7 +107,7 @@ mod csv {
         fw.platform_reset().unwrap();
     }
 
-     #[cfg_attr(not(has_dev_sev), ignore)]
+    #[cfg_attr(not(has_dev_sev), ignore)]
     #[test]
     fn get_identifier() {
         let mut fw = Firmware::open().unwrap();

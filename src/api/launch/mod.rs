@@ -12,20 +12,20 @@ pub(crate) mod types;
 use types::*;
 
 use crate::{
-    Version,
+    certs::{csv::Certificate, Signer, Usage, Verifiable},
+    crypto::{sig::ecdsa, sm, PrivateKey, PublicKey, Signature},
     util::*,
-    certs::{Signer, Usage, Verifiable, csv::Certificate},
-    crypto::{PrivateKey, sm, sig::ecdsa, PublicKey, Signature},
+    Version,
 };
 
+use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
-use bitflags::bitflags;
 use std::{
-    os::unix::io::AsRawFd,
     convert::*,
     io::{Read, Result, Write},
     mem::MaybeUninit,
+    os::unix::io::AsRawFd,
 };
 
 /// Launcher type-state that indicates a brand new launch.
@@ -138,7 +138,6 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
 
         Ok(next)
     }
-
 }
 
 impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
@@ -371,14 +370,11 @@ impl From<ecdsa::Signature> for SessionSig {
         for (i, b) in value.s.iter().take(32).cloned().enumerate() {
             s[i] = b;
         }
-        SessionSig {
-            r,
-            s,
-        }
+        SessionSig { r, s }
     }
 }
 
-impl From<SessionSig> for ecdsa::Signature{
+impl From<SessionSig> for ecdsa::Signature {
     #[inline]
     fn from(value: SessionSig) -> Self {
         let mut r = [0u8; 72];
@@ -389,10 +385,7 @@ impl From<SessionSig> for ecdsa::Signature{
         for (i, b) in value.s.iter().cloned().enumerate() {
             s[i] = b;
         }
-        ecdsa::Signature {
-            r,
-            s,
-        }
+        ecdsa::Signature { r, s }
     }
 }
 
@@ -403,8 +396,8 @@ impl From<SessionSig> for ecdsa::Signature{
 pub struct Session {
     /// Used for deriving a shared secret between the tenant
     /// and the HYGON SP.
-    pub body : SessionBody,
-    pub sig : SessionSig,
+    pub body: SessionBody,
+    pub sig: SessionSig,
 }
 
 impl Signer<Session> for PrivateKey<Usage> {

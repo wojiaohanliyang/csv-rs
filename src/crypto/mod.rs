@@ -13,9 +13,9 @@ use crate::{
     crypto::key::ecc,
     Body,
 };
-use std::io::{Error, ErrorKind, Result};
 use openssl::hash;
 use openssl_sys::EC_KEY;
+use std::io::{Error, ErrorKind, Result};
 
 #[derive(Debug)]
 pub struct Signature {
@@ -28,7 +28,7 @@ pub struct Signature {
 /// Represents a private key.
 pub struct PrivateKey<U> {
     pub id: Option<[u8; 16]>,
-    pub key: * mut EC_KEY,
+    pub key: *mut EC_KEY,
     pub hash: hash::MessageDigest,
     pub usage: U,
 }
@@ -69,10 +69,7 @@ impl PublicKey {
         })?
     }
 
-    pub fn encrypt(
-        &self,
-        data: &[u8],
-    ) -> Result<Vec<u8>> {
+    pub fn encrypt(&self, data: &[u8]) -> Result<Vec<u8>> {
         sm::SM2::encrypt(&data, self.key)
     }
 }

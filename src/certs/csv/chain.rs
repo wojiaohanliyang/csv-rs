@@ -4,8 +4,8 @@
 
 //! For operating on the CSV platform certificate chain.
 
-use super::*;
 use super::cert::Certificate;
+use super::*;
 use crate::certs::Usage;
 
 use serde::{Deserialize, Serialize};

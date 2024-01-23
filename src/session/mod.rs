@@ -8,7 +8,7 @@
 
 mod key;
 
-use crate::certs::{csv, Usage, Signer};
+use crate::certs::{csv, Signer, Usage};
 use crate::crypto::PrivateKey;
 
 use super::*;
@@ -62,9 +62,14 @@ impl std::convert::TryFrom<api::launch::Policy> for Session<Initialized> {
 }
 
 impl Session<Initialized> {
-    fn session(&self, nonce: [u8; 16], iv: [u8; 16], z: key::Key,
-        pdh_host: &csv::Certificate, prv: PrivateKey<Usage>) ->
-        Result<api::launch::Session> {
+    fn session(
+        &self,
+        nonce: [u8; 16],
+        iv: [u8; 16],
+        z: key::Key,
+        pdh_host: &csv::Certificate,
+        prv: PrivateKey<Usage>,
+    ) -> Result<api::launch::Session> {
         let master = z.derive(32, &nonce, "csv-master-secret")?;
         let kek = master.derive(32, &[], "csv-kek")?;
         let kik = master.derive(32, &[], "csv-kik")?;

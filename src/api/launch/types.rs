@@ -6,8 +6,8 @@
 //! Types for interacting with the KVM CSV guest management API.
 
 use crate::{
+    api::launch::{AttestationReport, Header, Measurement, Policy, Session},
     certs::csv::Certificate,
-    api::launch::{Policy, Session, Header, Measurement, AttestationReport},
 };
 
 use std::{

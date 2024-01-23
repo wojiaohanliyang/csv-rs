@@ -6,19 +6,18 @@
 //! Rust-fridenly API wrappers to communicate the the FFI functions.
 
 /// A handle to the CSV platform.
-
 mod ioctl;
 pub use ioctl::*;
 
 mod types;
 pub use types::*;
 
+use crate::{certs::csv::*, error::*, Build, Version};
 use std::{
     fs::{File, OpenOptions},
-    os::unix::io::{AsRawFd, RawFd},
     mem::MaybeUninit,
+    os::unix::io::{AsRawFd, RawFd},
 };
-use crate::{error::*, Build, Version, certs::csv::*};
 
 /// The CPU-unique identifier for the platform.
 #[derive(Clone, Debug, PartialEq, Eq)]

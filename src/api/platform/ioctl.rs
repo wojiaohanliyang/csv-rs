@@ -5,10 +5,10 @@
 //! A collection of type-safe ioctl implementations for the Hygon China Secure Virtualization
 //! (CSV) platform. These ioctls are exported by the Linux kernel.
 
+use super::types::*;
 use crate::impl_const_id;
 use iocuddle::{Group, Ioctl, WriteRead};
 use std::marker::PhantomData;
-use super::types::*;
 
 // These enum ordinal values are defined in the Linux kernel
 // source code: include/uapi/linux/psp-sev.h

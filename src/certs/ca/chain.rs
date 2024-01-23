@@ -5,7 +5,7 @@
 //! For operating on Certificate Authority chains.
 
 use super::*;
-use crate::certs::{Usage, ca::cert::Certificate};
+use crate::certs::{ca::cert::Certificate, Usage};
 
 use serde::{Deserialize, Serialize};
 

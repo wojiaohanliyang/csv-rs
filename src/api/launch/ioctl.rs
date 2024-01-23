@@ -7,8 +7,8 @@
 //! (CSV) platform. These ioctls are exported by the Linux kernel.
 
 use crate::{
-    error::{Error, Indeterminate},
     api::launch::types::*,
+    error::{Error, Indeterminate},
     impl_const_id,
 };
 
@@ -72,8 +72,7 @@ pub const LAUNCH_UPDATE_VMSA: Ioctl<WriteRead, &Command<LaunchUpdateVmsa>> =
 pub const LAUNCH_SECRET: Ioctl<WriteRead, &Command<LaunchSecret>> = unsafe { ENC_OP.lie() };
 
 /// Get the guest's measurement.
-pub const LAUNCH_MEASUREMENT: Ioctl<WriteRead, &Command<LaunchMeasure>> =
-    unsafe { ENC_OP.lie() };
+pub const LAUNCH_MEASUREMENT: Ioctl<WriteRead, &Command<LaunchMeasure>> = unsafe { ENC_OP.lie() };
 
 /// Complete the CSV launch flow and transition the guest into
 /// the ready state.

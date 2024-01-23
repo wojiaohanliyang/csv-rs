@@ -7,7 +7,7 @@ use std::{
     mem::{size_of_val, MaybeUninit},
 };
 
-use crate::{certs::csv, Version, Build};
+use crate::{certs::csv, Build, Version};
 
 /// Reset the platform's persistent state.
 pub struct PlatformReset;
@@ -155,7 +155,10 @@ pub struct PdhCertExport<'a> {
 }
 
 impl<'a> PdhCertExport<'a> {
-    pub fn new(pdh: &'a mut MaybeUninit<csv::Certificate>, certs: &'a mut MaybeUninit<[csv::Certificate; 3]>) -> Self {
+    pub fn new(
+        pdh: &'a mut MaybeUninit<csv::Certificate>,
+        certs: &'a mut MaybeUninit<[csv::Certificate; 3]>,
+    ) -> Self {
         Self {
             pdh_addr: pdh as *mut _ as _,
             pdh_len: size_of_val(pdh) as _,

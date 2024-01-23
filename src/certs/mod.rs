@@ -100,8 +100,7 @@ impl TryFrom<Usage> for Algorithm {
     fn try_from(value: Usage) -> Result<Self> {
         match value {
             Usage::PDH => Ok(Algorithm::SM2_DH),
-            Usage::HRK | Usage::HSK | Usage::OCA | Usage::PEK | Usage::CEK =>
-                Ok(Algorithm::SM2_SA),
+            Usage::HRK | Usage::HSK | Usage::OCA | Usage::PEK | Usage::CEK => Ok(Algorithm::SM2_SA),
 
             _ => Err(ErrorKind::InvalidInput.into()),
         }
@@ -135,9 +134,7 @@ impl TryFrom<Algorithm> for hash::MessageDigest {
 
     fn try_from(value: Algorithm) -> Result<Self> {
         match value {
-            Algorithm::SM2_SA | Algorithm::SM2_DH => {
-                Ok(hash::MessageDigest::sm3())
-            }
+            Algorithm::SM2_SA | Algorithm::SM2_DH => Ok(hash::MessageDigest::sm3()),
 
             _ => Err(ErrorKind::InvalidInput.into()),
         }

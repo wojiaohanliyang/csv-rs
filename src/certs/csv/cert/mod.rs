@@ -7,8 +7,8 @@
 pub mod key;
 
 use crate::{
-    certs::{ca, Algorithm, Usage, Verifiable, Signer},
-    crypto::{key::ecc, sig::ecdsa, PublicKey, Signature, PrivateKey, sm, self},
+    certs::{ca, Algorithm, Signer, Usage, Verifiable},
+    crypto::{self, key::ecc, sig::ecdsa, sm, PrivateKey, PublicKey, Signature},
     util::*,
 };
 use serde::{Deserialize, Serialize};
@@ -63,9 +63,7 @@ impl TryFrom<&crypto::Signature> for Signatures {
 
     #[inline]
     fn try_from(value: &crypto::Signature) -> Result<Self> {
-        let algo = value.algo.unwrap_or_else(|| {
-            Algorithm::NONE
-        });
+        let algo = value.algo.unwrap_or_else(|| Algorithm::NONE);
         Ok(Signatures {
             usage: value.usage,
             algo,

@@ -4,8 +4,8 @@
 
 //! Helpful primitives for developing the crate.
 
-mod impl_const_id;
 pub mod cached_chain;
+mod impl_const_id;
 
 use std::{
     io::{Read, Result, Write},
@@ -75,7 +75,3 @@ pub trait TypeSave: Write {
 
 impl<T: Read> TypeLoad for T {}
 impl<T: Write> TypeSave for T {}
-
-
-
-
