@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::util::*;
+use log::*;
 use openssl::{bn, ecdsa};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
@@ -63,5 +64,11 @@ impl Default for Signature {
             r: [0u8; 72],
             s: [0u8; 72],
         }
+    }
+}
+impl Signature {
+    pub fn print_fields(&self) {
+        debug!("r: {:?}", self.r);
+        debug!("s: {:?}", self.s);
     }
 }
