@@ -14,6 +14,10 @@ fn main() {
     if cfg!(feature = "hw_tests") || Path::new("/dev/csv-guest").exists() {
         println!("cargo:rustc-cfg=has_dev_csv_guest");
     }
+    println!("cargo:rustc-check-cfg=cfg(has_dev_dcu)");
+    if cfg!(feature = "hw_tests") || Path::new("/dev/mkfd").exists() {
+        println!("cargo:rustc-cfg=has_dev_dcu");
+    }
 
     if let Ok(version) = env::var("DEP_OPENSSL_VERSION_NUMBER") {
         let version = u64::from_str_radix(&version, 16).unwrap();

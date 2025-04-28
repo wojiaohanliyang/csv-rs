@@ -11,8 +11,10 @@ use crate::{
     crypto::{self, key::ecc, sig::ecdsa, sm, PrivateKey, PublicKey, Signature},
     util::*,
 };
+use log::*;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
+use std::env;
 use std::io::{Error, ErrorKind, Read, Result, Write};
 
 #[repr(C)]
@@ -78,6 +80,16 @@ impl TryFrom<&crypto::Signature> for Signatures {
 pub struct Certificate {
     pub body: Body,
     pub sigs: [Signatures; 2],
+}
+
+impl Certificate {
+    /// Writes the certificate content to a file.
+    pub fn write_to_file(&self, path: &std::path::Path) -> Result<()> {
+        let mut file = std::fs::File::create(path)?;
+        let encoded = bincode::serialize(self).map_err(|e| Error::new(ErrorKind::Other, e))?;
+        file.write_all(&encoded)?;
+        Ok(())
+    }
 }
 
 impl TryFrom<&Signatures> for Option<Signature> {
@@ -313,5 +325,54 @@ impl Certificate {
     pub fn encrypt(&self, data: &[u8]) -> Result<Vec<u8>> {
         let key: PublicKey = self.try_into()?;
         key.encrypt(data)
+    }
+}
+
+/// Downloads the HSK CEK certificate from the hygon certificate server.
+#[cfg(feature = "network")]
+pub async fn download_hskcek(
+    sn: &[u8],
+) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+    // Convert serial number bytes to string and trim null terminator
+    let chip_id = std::str::from_utf8(sn)?.trim_end_matches('\0');
+    let kds_url = format!("https://cert.hygon.cn/hsk_cek?snumber={chip_id}");
+    trace!("kds_url: {}", kds_url);
+    // Create async HTTP client (recommend reusing client in production)
+    let response = reqwest::Client::new()
+        .get(&kds_url)
+        .header("User-Agent", "Reqwest")
+        .send()
+        .await?; // Async await for request completion
+
+    // Async read response body
+    let response_body = response.bytes().await?.to_vec();
+    Ok(response_body)
+}
+
+/// Retrieves certificate data either from local storage or via network download.
+#[cfg(feature = "network")]
+pub async fn get_certificate_data(
+    chip_id: &[u8; 16],
+) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+    // 1. Get certificate directory path (from env var or use default)
+    let cert_dir = env::var("HSK_CEK_CERT_PATH").unwrap_or_else(|_| "/opt/dcu/certs".to_string());
+
+    // 2.Convert chip_id to string
+    let chip_id_str =
+        std::str::from_utf8(chip_id).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+
+    // 3. Build full certificate path
+    let cert_path = format!("{}/{}_hsk_cek.cert", cert_dir, chip_id_str);
+
+    // 4. Check file existence and read or download
+    if tokio::fs::metadata(&cert_path).await.is_ok() {
+        debug!("Reading certificate from: {}", cert_path);
+        tokio::fs::read(cert_path).await.map_err(Into::into)
+    } else {
+        debug!(
+            "Certificate not found at {}, attempting download",
+            cert_path
+        );
+        download_hskcek(chip_id).await
     }
 }

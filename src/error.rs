@@ -142,8 +142,11 @@ pub enum Error {
     /// The key requested is invalid, not present, or not allowed.
     InvalidKey, // 0x0027
 
+    /// Custom error message (catch-all for unclassified errors)
+    Custom(String), // 0x0028
+
     /// Unknown error
-    Unknown, // 0x0028
+    Unknown, // 0x0029
 }
 
 /// There are a number of error conditions that can occur between this
@@ -209,6 +212,7 @@ impl std::fmt::Display for Error {
             Error::RestoreRequired => "Installation of the committed firmware image required.",
             Error::RMPInitFailed => "The RMP initialization failed.",
             Error::InvalidKey => "The key requested is invalid, not present, or not allowed",
+            Error::Custom(msg) => msg,
             Error::Unknown => "Unknown Error",
         };
         write!(f, "{err_description}")
@@ -301,6 +305,7 @@ impl From<u32> for Indeterminate<Error> {
             0x25 => Error::RestoreRequired,
             0x26 => Error::RMPInitFailed,
             0x27 => Error::InvalidKey,
+            0x28 => Error::Custom(format!("Custom error (code: 0x{:X})", error)),
             _ => return Indeterminate::Unknown,
         })
     }
@@ -313,5 +318,11 @@ impl From<Indeterminate<Error>> for io::Error {
             Indeterminate::Known(e) => io::Error::new(io::ErrorKind::Other, e),
             Indeterminate::Unknown => io::Error::new(io::ErrorKind::Other, "unknown CSV error"),
         }
+    }
+}
+
+impl From<Box<dyn std::error::Error + Send + Sync>> for Error {
+    fn from(e: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        Error::Custom(e.to_string())
     }
 }

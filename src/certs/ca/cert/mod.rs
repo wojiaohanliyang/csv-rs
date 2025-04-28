@@ -12,7 +12,7 @@ use crate::{
 
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
-use std::io::{Error, Read, Result, Write};
+use std::io::{Error, ErrorKind, Read, Result, Write};
 
 #[repr(C)]
 #[derive(Copy, Clone, Serialize, Deserialize)]
@@ -50,6 +50,16 @@ pub struct Certificate {
     signature: ecdsa::Signature,
     #[serde(with = "BigArray")]
     _reserved: [u8; 112],
+}
+
+impl Certificate {
+    /// Writes the certificate content to a file.
+    pub fn write_to_file(&self, path: &std::path::Path) -> Result<()> {
+        let mut file = std::fs::File::create(path)?;
+        let encoded = bincode::serialize(self).map_err(|e| Error::new(ErrorKind::Other, e))?;
+        file.write_all(&encoded)?;
+        Ok(())
+    }
 }
 
 impl TryFrom<&Certificate> for Signature {
