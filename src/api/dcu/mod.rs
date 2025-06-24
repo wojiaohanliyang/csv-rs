@@ -60,7 +60,7 @@ impl DcuDevice {
     /// Get attestation reports from all available DCU nodes
     ///
     /// # Arguments
-    /// * `mnonce` - 16-byte nonce value used for attestation request
+    /// * `userdata` - 64-byte user data value used for attestation request
     ///
     /// # Returns
     /// - `Ok(Vec<AttestationReport>)` containing valid attestation reports
@@ -68,7 +68,7 @@ impl DcuDevice {
     ///   - No valid reports are obtained
     ///   - IOCTL operations fail
     ///   - DCU node communication fails
-    pub fn get_report(&mut self, mnonce: [u8; 16]) -> Result<Vec<AttestationReport>, Error> {
+    pub fn get_report(&mut self, userdata: [u8; 64]) -> Result<Vec<AttestationReport>, Error> {
         // Discover available DCU nodes
         let num_node = num_subdirs("/sys/devices/virtual/kfd/kfd/topology/nodes", "");
         let mut reports: Vec<AttestationReport> = Vec::with_capacity(num_node);
@@ -87,7 +87,7 @@ impl DcuDevice {
 
                 // Initialize attestation request
                 let mut args = MkfdIoctlSecurityAttestationArgs::new();
-                args.set_attestation_args(dcu_id, mnonce)?;
+                args.set_attestation_args(dcu_id, userdata)?;
 
                 // Execute IOCTL request
                 if DCU_GET_REPORT.ioctl(&mut self.0, &mut args)? == 0 {
@@ -124,16 +124,16 @@ impl DcuDevice {
 ///
 /// # Arguments
 /// * `reports` - Slice of [`AttestationReport`] structures to verify
-/// * `mnonce` - 16-byte expected nonce value (must match each report's embedded nonce)
+/// * `userdata` - 64-byte expected nonce value (must match each report's embedded user data)
 ///
 /// # Returns
 /// * `Ok(())` if all reports pass verification
 /// * `Err(Error)` containing the first encountered verification failure
 #[cfg(feature = "network")]
-pub async fn verify_reports(reports: &[AttestationReport], mnonce: &[u8; 16]) -> Result<(), Error> {
+pub async fn verify_reports(reports: &[AttestationReport], userdata: &[u8; 64]) -> Result<(), Error> {
     for report in reports {
         let cert_data = csv::cert::get_certificate_data(&report.body.chip_id).await?;
-        verify_report(report, mnonce, &cert_data)?;
+        verify_report(report, userdata, &cert_data)?;
     }
     Ok(())
 }
@@ -162,7 +162,7 @@ pub async fn verify_reports(reports: &[AttestationReport], mnonce: &[u8; 16]) ->
 /// - Nonce mismatches
 pub fn verify_report(
     report: &AttestationReport,
-    mnonce: &[u8; 16],
+    userdata: &[u8; 64],
     cert_data: &[u8],
 ) -> Result<(), Error> {
     let mut cert_slice = cert_data;
@@ -175,7 +175,7 @@ pub fn verify_report(
     report.print_report();
 
     // Critical security check: nonce matching
-    if mnonce != &report.body.mnonce {
+    if userdata != &report.body.user_data {
         return Err(
             io::Error::new(io::ErrorKind::InvalidData, "Attestation nonce mismatch").into(),
         );

@@ -5,20 +5,21 @@
 
 use csv_rs::api::dcu::*;
 //use crate::certs::csv;
+use rand::{thread_rng, Rng};
 
 #[cfg_attr(not(has_dev_dcu), ignore)]
 #[test_log::test]
 fn get_report() {
-    let mnonce: [u8; 16] = [
-        112, 233, 62, 161, 65, 225, 252, 103, 62, 1, 126, 151, 234, 220, 107, 150,
-    ];
+    let mut rng = thread_rng();
+    let mut userdata = [0u8; 64];
+    rng.fill(&mut userdata);
 
     let mut dcu_device: DcuDevice = DcuDevice::new().unwrap();
 
-    let reports = dcu_device.get_report(mnonce).unwrap();
+    let reports = dcu_device.get_report(userdata).unwrap();
 
     for report in &reports {
-        assert_eq!(mnonce, report.body.mnonce);
+        assert_eq!(userdata, report.body.user_data);
     }
 }
 
@@ -26,12 +27,12 @@ fn get_report() {
 #[cfg(feature = "network")]
 #[tokio::test]
 async fn get_report_and_verify() {
-    let mnonce: [u8; 16] = [
-        112, 233, 62, 161, 65, 225, 252, 103, 62, 1, 126, 151, 234, 220, 107, 150,
-    ];
+    let mut rng = thread_rng();
+    let mut userdata = [0u8; 64];
+    rng.fill(&mut userdata);
     let mut dcu_device = DcuDevice::new().unwrap();
 
-    let reports = dcu_device.get_report(mnonce).unwrap();
+    let reports = dcu_device.get_report(userdata).unwrap();
 
-    verify_reports(&reports, &mnonce).await.unwrap();
+    verify_reports(&reports, &userdata).await.unwrap();
 }

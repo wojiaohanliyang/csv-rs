@@ -13,6 +13,8 @@ use log::*;
 use serde::{Deserialize, Serialize};
 use std::ffi::c_void;
 use std::io::Write;
+use serde_bytes::ByteBuf;
+use hex::encode;
 
 /// A structure representing the body of an attestation report.
 /// This is marked with `repr(C)` for C compatibility and can be serialized/deserialized.
@@ -23,10 +25,14 @@ pub struct Body {
     pub version: u32,
     /// Unique identifier of the hardware chip (16 bytes)
     pub chip_id: [u8; 16],
-    /// Nonce value (16 bytes)
-    pub mnonce: [u8; 16],
+    /// User data value (64 bytes)
+    #[serde(with = "serde_bytes")]
+    pub user_data: [u8; 64],
     /// Measurement data (32 bytes)
     pub measure: [u8; 32],
+    /// Reserved data (128 bytes)
+    #[serde(with = "serde_bytes")]
+    pub reserved: [u8; 128],
     /// Indicates the purpose/usage of the signature
     pub sig_usage: u32,
     /// Algorithm used for generating the signature
@@ -39,8 +45,9 @@ impl Default for Body {
         Self {
             version: Default::default(),
             chip_id: Default::default(),
-            mnonce: Default::default(),
+            user_data: [0u8;64],
             measure: Default::default(),
+            reserved: [0u8;128],
             sig_usage: Default::default(),
             sig_algo: Default::default(),
         }
@@ -52,7 +59,7 @@ impl Body {
     pub fn print_fields(&self) {
         trace!("Version: {}", self.version);
         trace!("Chip ID: {}", String::from_utf8_lossy(&self.chip_id));
-        trace!("MNonce: {:?}", self.mnonce);
+        trace!("User data: {}", encode(&self.user_data));
         trace!("Measure: {:?}", self.measure);
         trace!("Signature Usage: {}", self.sig_usage);
         trace!("Signature Algorithm: {}", self.sig_algo);
