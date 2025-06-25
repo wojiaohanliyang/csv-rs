@@ -34,6 +34,7 @@ pub const DCU_GET_REPORT: Ioctl<WriteRead, &MkfdIoctlSecurityAttestationArgs> =
 pub struct MkfdIoctlSecurityAttestationArgs {
     /// DCU identifier for target device
     pub dcu_id: u32,
+    pub cmd_id :u32,
     /// Message version number(default 1)
     pub version: u32,
     /// Request structure address
@@ -54,6 +55,8 @@ impl MkfdIoctlSecurityAttestationArgs {
     pub fn new() -> Self {
         Self {
             dcu_id: 0,
+            ///attestation command
+            cmd_id: 0,
             version: 1,
             request_data: std::ptr::null_mut(),
             request_size: 0,
@@ -70,8 +73,8 @@ impl MkfdIoctlSecurityAttestationArgs {
     ///
     /// # Arguments
     /// * `dcu_id` - Target DCU device identifier
-    /// * `mnonce` - 16-byte cryptographic nonce for attestation
-    pub fn set_attestation_args(&mut self, dcu_id: u32, mnonce: [u8; 16]) -> std::io::Result<()> {
+    /// * `userdata` - 64-byte cryptographic nonce for attestation
+    pub fn set_attestation_args(&mut self, dcu_id: u32, userdata: [u8; 64]) -> std::io::Result<()> {
         unsafe {
             // Allocate page-aligned request buffer
             self.request_data = libc::malloc(PAGE_SIZE);
@@ -85,14 +88,14 @@ impl MkfdIoctlSecurityAttestationArgs {
 
             // Copy nonce into request buffer
             std::ptr::copy_nonoverlapping(
-                mnonce.as_ptr(),
+                userdata.as_ptr(),
                 self.request_data as *mut u8,
-                mnonce.len(),
+                userdata.len(),
             );
 
             // Debug output: hex dump of nonce in request buffer
             trace!("Generated random number for DCU report request");
-            hex_dump(self.request_data as *const u8, 16);
+            hex_dump(self.request_data as *const u8, 64);
 
             // Allocate page-aligned response buffer
             self.response_data = libc::malloc(PAGE_SIZE);
