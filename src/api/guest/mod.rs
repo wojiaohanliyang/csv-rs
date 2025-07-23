@@ -11,6 +11,9 @@ use rand::Rng;
 use std::fs::{File, OpenOptions};
 pub use types::*;
 
+pub mod rtmr;
+pub use rtmr::*;
+
 /// A handle to the CSV guest device.
 pub struct CsvGuest(File);
 
@@ -66,5 +69,199 @@ impl CsvGuest {
         )?;
 
         Ok((report_response.report, report_response.signer))
+    }
+
+    /// Request rtmr_status
+    pub fn req_rtmr_status(
+        &mut self,
+    ) -> Result<CsvGuestUserRtmrStatus, std::io::Error> {
+        let mut rtmr_status = CsvGuestUserRtmrStatus::new();
+
+        let rtmr_status_bytes: &mut [u8] = unsafe {
+            std::slice::from_raw_parts_mut(
+                &mut rtmr_status as *mut _ as *mut u8,
+                std::mem::size_of::<CsvGuestUserRtmrStatus>(),
+            )
+        };
+
+        let mut rtmr_request = GuestRtmrRequest::new(
+            rtmr_status_bytes.as_ref(),
+            CsvGuestUserRtmrSubcmd::Status
+        );
+
+        match CSV_RTMR_REQ.ioctl(&mut self.0, &mut rtmr_request) {
+            Ok(return_code) => {
+                if return_code == 0 {
+                    let fw_error_code = rtmr_request.get_fw_error_code();
+                    if fw_error_code == 0 {
+                        Ok(rtmr_status)
+                    } else {
+                        Err(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("rtmr_status fail, fw_err: {}", fw_error_code)
+                        ))
+                    }
+                } else {
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("rtmr_status fail, rc: {}", return_code)
+                    ))
+                }
+            }
+            Err(err) => {
+                Err(err)
+            }
+        }
+    }
+
+    /// Request rtmr_start
+    pub fn req_rtmr_start(
+        &mut self,
+        version: u16,
+    ) -> Result<CsvGuestUserRtmrStart, std::io::Error> {
+        let mut rtmr_start = CsvGuestUserRtmrStart::new(version);
+
+        let rtmr_start_bytes: &mut [u8] = unsafe {
+            std::slice::from_raw_parts_mut(
+                &mut rtmr_start as *mut _ as *mut u8,
+                std::mem::size_of::<CsvGuestUserRtmrStart>(),
+            )
+        };
+
+        let mut rtmr_request = GuestRtmrRequest::new(
+            rtmr_start_bytes.as_ref(),
+            CsvGuestUserRtmrSubcmd::Start
+        );
+
+        match CSV_RTMR_REQ.ioctl(&mut self.0, &mut rtmr_request) {
+            Ok(return_code) => {
+                if return_code == 0 {
+                    let fw_error_code = rtmr_request.get_fw_error_code();
+                    if fw_error_code == 0 {
+                        Ok(rtmr_start)
+                    } else {
+                        Err(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("rtmr_start fail, fw_err: {}", fw_error_code)
+                        ))
+                    }
+                } else {
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("rtmr_start fail, rc: {}", return_code)
+                    ))
+                }
+            }
+            Err(err) => {
+                Err(err)
+            }
+        }
+    }
+
+    /// Request rtmr_read
+    pub fn req_rtmr_read(
+        &mut self,
+        bitmap: u32
+    ) -> Result<(Box<[u8]>, &mut CsvGuestUserRtmrRead), std::io::Error> {
+        let mut num_regs: usize = 0;
+
+        for i in 0..CSV_RTMR_REG_NUM {
+            if bitmap & (1 << i) != 0 {
+                num_regs += 1;
+            }
+        }
+
+        let (mut _buffer, rtmr_read) = CsvGuestUserRtmrRead::allocate_with_capacity(
+            bitmap,
+            num_regs
+        );
+
+        let mut rtmr_request = GuestRtmrRequest::new(
+            &_buffer.as_ref(),
+            CsvGuestUserRtmrSubcmd::Read
+        );
+
+        match CSV_RTMR_REQ.ioctl(&mut self.0, &mut rtmr_request) {
+            Ok(return_code) => {
+                if return_code == 0 {
+                    let fw_error_code = rtmr_request.get_fw_error_code();
+                    if fw_error_code == 0 {
+                        Ok((_buffer, rtmr_read))
+                    } else {
+                        Err(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("rtmr_read fail, fw_err: {}", fw_error_code)
+                        ))
+                    }
+                } else {
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("rtmr_read fail, rc: {}", return_code)
+                    ))
+                }
+            }
+            Err(err) => {
+                Err(err)
+            }
+        }
+    }
+
+    /// Request rtmr_extend
+    pub fn req_rtmr_extend(
+        &mut self,
+        index: u8,
+        data: &[u8],
+    ) -> Result<CsvGuestUserRtmrExtend, std::io::Error> {
+        let mut rtmr_extend = CsvGuestUserRtmrExtend::new(index, data)?;
+
+        let rtmr_extend_bytes: &mut [u8] = unsafe {
+            std::slice::from_raw_parts_mut(
+                &mut rtmr_extend as *mut _ as *mut u8,
+                std::mem::size_of::<CsvGuestUserRtmrExtend>(),
+            )
+        };
+
+        let mut rtmr_request = GuestRtmrRequest::new(
+            rtmr_extend_bytes.as_ref(),
+            CsvGuestUserRtmrSubcmd::Extend
+        );
+
+        match CSV_RTMR_REQ.ioctl(&mut self.0, &mut rtmr_request) {
+            Ok(return_code) => {
+                if return_code == 0 {
+                    let fw_error_code = rtmr_request.get_fw_error_code();
+                    if fw_error_code == 0 {
+                        Ok(rtmr_extend)
+                    } else {
+                        Err(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("rtmr_extend fail, fw_err: {}", fw_error_code)
+                        ))
+                    }
+                } else {
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("rtmr_extend fail, rc: {}", return_code)
+                    ))
+                }
+            }
+            Err(err) => {
+                Err(err)
+            }
+        }
+    }
+
+    /// Query if the rtmr is supported.
+    /// The rtmr_status request will succeed when rtmr is supported.
+    pub fn check_rtmr_supported(&mut self) -> bool {
+        match self.req_rtmr_status() {
+            Ok(_) => {
+                true
+            }
+            Err(err) => {
+                println!("error: {}", err);
+                false
+            }
+        }
     }
 }
