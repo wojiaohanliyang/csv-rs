@@ -24,12 +24,18 @@ impl CsvGuest {
         Ok(CsvGuest(file))
     }
 
-    /// Requests an attestation report from the HYGON Secure Processor.
+    /// Requests an legacy attestation report (i.e. AttestationReportV1) from
+    /// the HYGON Secure Processor.
+    ///
+    /// Hygon CSV1,CSV2 only support legacy attestation report.
+    /// Hygon CSV3 supports legacy attestation report, and supports extended
+    /// attestation report (i.e. AttestationReportV2) if the firmware has a
+    /// build version >= 2337.
     pub fn get_report(
         &mut self,
         data: Option<[u8; 64]>,
         mnonce: Option<[u8; 16]>,
-    ) -> Result<(AttestationReport, ReportSigner), Error> {
+    ) -> Result<AttestationReportWrapper, Error> {
         let mut mnonce_value = [0u8; 16];
         if let Some(mnonce) = mnonce {
             mnonce_value = mnonce;
@@ -42,7 +48,7 @@ impl CsvGuest {
 
         let report_request = ReportReq::new(data, mnonce_value)?;
 
-        let mut report_response = ReportRsp::default();
+        let mut report_response = AttestationReportV1::default();
 
         // Convert ReportReq to bytes
         let request_bytes: &[u8] = unsafe {
@@ -51,8 +57,8 @@ impl CsvGuest {
         };
 
         let response_bytes: &mut [u8] = unsafe {
-            let rsp_ptr = &mut report_response as *mut ReportRsp as *mut u8;
-            std::slice::from_raw_parts_mut(rsp_ptr, std::mem::size_of::<ReportRsp>())
+            let rsp_ptr = &mut report_response as *mut AttestationReportV1 as *mut u8;
+            std::slice::from_raw_parts_mut(rsp_ptr, std::mem::size_of::<AttestationReportV1>())
         };
 
         // Copy bytes from report_request to report_response
@@ -64,11 +70,83 @@ impl CsvGuest {
 
         report_response.signer.verify(
             &mnonce_value,
-            &report_response.report.body.mnonce,
-            &report_response.report.anonce,
+            &report_response.tee_info.mnonce,
+            &report_response.tee_info.anonce,
         )?;
 
-        Ok((report_response.report, report_response.signer))
+
+        Ok(AttestationReportWrapper::new(
+            [0u8; 16],
+            0,
+            response_bytes
+        ))
+    }
+
+    /// Requests an extended attestation report (i.e. AttestationReportV2) from
+    /// the HYGON Secure Processor.
+    ///
+    /// Hygon CSV1,CSV2 only support legacy attestation report.
+    /// Hygon CSV3 supports legacy attestation report, and supports extended
+    /// attestation report if the firmware has a build version >= 2337.
+    ///
+    /// If extended attestation report is not supported, then request legacy
+    /// attestation report.
+    pub fn get_report_ext(
+        &mut self,
+        data: Option<[u8; 64]>,
+        mnonce: Option<[u8; 16]>,
+        flags: u32,
+    ) -> Result<AttestationReportWrapper, Error> {
+        if self.check_attestation_report_v2_supported() == false {
+            self.get_report(data, mnonce)
+        } else if flags == 0 {
+            // If flags is 0, generate AttestationReportV1.
+            self.get_report(data, mnonce)
+        } else {
+            let mut mnonce_value = [0u8; 16];
+            if let Some(mnonce) = mnonce {
+                mnonce_value = mnonce;
+            } else {
+                let mut rng = rand::thread_rng();
+                for element in &mut mnonce_value {
+                    *element = rng.gen();
+                }
+            }
+
+            let report_request = ReportReqExt::new(data, mnonce_value, flags)?;
+
+            let mut report_response = AttestationReportV2::default();
+
+            // Convert ReportReqExt to bytes
+            let request_bytes: &[u8] = unsafe {
+                let req_ptr = &report_request as *const ReportReqExt as *const u8;
+                std::slice::from_raw_parts(req_ptr, std::mem::size_of::<ReportReqExt>())
+            };
+
+            let response_bytes: &mut [u8] = unsafe {
+                let rsp_ptr = &mut report_response as *mut AttestationReportV2 as *mut u8;
+                std::slice::from_raw_parts_mut(rsp_ptr, std::mem::size_of::<AttestationReportV2>())
+            };
+
+            // Copy bytes from report_request_ext to report_response_ext
+            response_bytes[..request_bytes.len()].copy_from_slice(request_bytes);
+
+            let mut guest_report_request = GuestReportRequest::new(response_bytes.as_ref());
+
+            CSV_GET_REPORT.ioctl(&mut self.0, &mut guest_report_request)?;
+
+            report_response.signer.verify(
+                &mnonce_value,
+                &report_response.tee_info.mnonce,
+                &0,
+            )?;
+
+            Ok(AttestationReportWrapper::new(
+                ATTESTATION_EXT_MAGIC,
+                flags,
+                response_bytes,
+            ))
+        }
     }
 
     /// Request rtmr_status
@@ -263,5 +341,11 @@ impl CsvGuest {
                 false
             }
         }
+    }
+
+    /// Query if AttestationReportV2 is supported. It's supported when rtmr is
+    /// supported.
+    pub fn check_attestation_report_v2_supported(&mut self) -> bool {
+        self.check_rtmr_supported()
     }
 }

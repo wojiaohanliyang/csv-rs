@@ -13,7 +13,7 @@ use crate::crypto::PrivateKey;
 
 use super::*;
 
-use std::io::{Error, ErrorKind, Result};
+use std::io::{Error, Result};
 
 use openssl::*;
 

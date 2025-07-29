@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use crate::api::guest::CSV_RTMR_REG_SIZE;
 use crate::error::*;
 use crate::{
     certs::{csv::Certificate, Usage, Verifiable},
@@ -22,6 +23,8 @@ use serde_big_array::BigArray;
 use std::io::Write;
 
 use bitfield::bitfield;
+
+pub const ATTESTATION_EXT_MAGIC: [u8; 16] = *b"ATTESTATION_EXT\0";
 
 /// Data provieded by the guest owner for requesting an attestation report
 /// from the HYGON Secure Processor.
@@ -72,49 +75,499 @@ impl ReportReq {
     }
 }
 
+/// Data provieded by the guest owner for requesting an extended attestation
+/// report from the HYGON Secure Processor.
+#[repr(C)]
+#[derive(PartialEq, Debug)]
+pub struct ReportReqExt {
+    /// Guest-provided data to be included in the attestation report
+    pub data: [u8; 64],
+    /// Guest-provided mnonce to be placed in the report to provide protection
+    pub mnonce: [u8; 16],
+    /// hash of [`data`] and [`mnonce`] to provide protection
+    pub hash: [u8; 32],
+    /// magic string to indicate extension aware request
+    pub magic: [u8; 16],
+    /// flags to indicate how to extend the attestation report
+    pub flags: u32,
+}
+
+impl Default for ReportReqExt {
+    fn default() -> Self {
+        Self {
+            data: [0u8; 64],
+            mnonce : [0u8; 16],
+            hash: [0u8; 32],
+            magic: ATTESTATION_EXT_MAGIC,
+            flags: 0,
+        }
+    }
+}
+
+impl ReportReqExt {
+    pub fn new(data: Option<[u8; 64]>, mnonce: [u8; 16], flags: u32) -> Result<Self, Error> {
+        let mut request = Self::default();
+
+        if let Some(data) = data {
+            request.data = data;
+        }
+
+        request.mnonce = mnonce;
+
+        request.calculate_hash()?;
+
+        request.flags = flags;
+
+        Ok(request)
+    }
+
+    fn calculate_hash(&mut self) -> Result<(), Error> {
+        let mut hasher = Hasher::new(MessageDigest::sm3())?;
+        hasher.update(self.data.as_ref())?;
+        hasher.update(self.mnonce.as_ref())?;
+        let hash = &hasher.finish()?;
+        self.hash.copy_from_slice(hash.as_ref());
+
+        Ok(())
+    }
+}
+
+/// Wrapper struct for both legacy attestation report and extended attestation
+/// report.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AttestationReportWrapper {
+    /// The magic string to indicate the attestation report type.
+    magic: [u8; 16],
+    /// The flags indicate how to parse the extended attestation report.
+    /// Note: the bit0 of flags must be 1.
+    flags: u32,
+    #[serde(with = "BigArray")]
+    /// Both the legacy and extended attestation report are padded to 4096 bytes.
+    data: [u8; 4096],
+}
+
+impl AttestationReportWrapper {
+    pub fn new(magic: [u8; 16], flags: u32, report: &mut [u8] ) -> Self {
+        let mut bytes = [0u8; 4096];
+
+        let copy_len = std::cmp::min(report.len(), 4096);
+        bytes[..copy_len].copy_from_slice(&report[..copy_len]);
+
+        Self {
+            magic: magic,
+            flags: flags,
+            data: bytes,
+        }
+    }
+}
+
+/// Enum Containing the different versions of the Attestation Report
+///
+/// Since the release of the firmware API version 1.4, the attestation report
+/// support extended format. In order to keep backwards compatibility, use
+/// enum V1(AttestationReportV1) to handling legacy attestation report.
+///
+/// The V2(AttestationReportV2) is referred to as extended attestation report.
+pub enum AttestationReport {
+    /// Version 1 of the Attestation Report returned by the firmware
+    V1(AttestationReportV1),
+    /// Version 2 of the Attestation Report returned by the firmware
+    V2(AttestationReportV2),
+}
+
+impl TryFrom<&AttestationReportWrapper> for AttestationReport {
+    type Error = std::io::Error;
+
+    fn try_from(report_wrapper: &AttestationReportWrapper) -> Result<Self, Self::Error> {
+        match (report_wrapper.magic, report_wrapper.flags) {
+            (magic, _) if magic == *b"\0".repeat(16) => {
+                let report_v1: AttestationReportV1 = TryFrom::try_from(&report_wrapper.data[..])?;
+                Ok(AttestationReport::V1(report_v1))
+            }
+            (ATTESTATION_EXT_MAGIC, 0) => {
+                let report_v1: AttestationReportV1 = TryFrom::try_from(&report_wrapper.data[..])?;
+                Ok(AttestationReport::V1(report_v1))
+            }
+            (ATTESTATION_EXT_MAGIC, 1) => {
+                let report_v2: AttestationReportV2 = TryFrom::try_from(&report_wrapper.data[..])?;
+                Ok(AttestationReport::V2(report_v2))
+            }
+            _ => {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Invalid AttestationReport")
+                ))
+            }
+        }
+    }
+}
+
+impl AttestationReport {
+    /// Get version of the Attestation Report
+    pub fn version(&self) -> u32 {
+        match self {
+            Self::V1(_) => 1,
+            Self::V2(_) => 2,
+        }
+    }
+
+    /// Get tee info of the Attestation Report
+    pub fn tee_info(&self) -> TeeInfo<'_> {
+        match self {
+            Self::V1(report) => TeeInfo::V1(&report.tee_info),
+            Self::V2(report) => TeeInfo::V2(&report.tee_info),
+        }
+    }
+
+    /// Get the tee info signer of the attestation report
+    pub fn signer(&self) -> &TeeInfoSigner {
+        match self {
+            Self::V1(report) => &report.signer,
+            Self::V2(report) => &report.signer,
+        }
+    }
+}
+
 /// The response from the PSP containing the generated attestation report.
 ///
 /// The Report is padded to exactly 4096 Bytes to make sure the page size
 /// matches.
 #[repr(C)]
-pub struct ReportRsp {
-    /// The attestation report generated by the firmware.
-    pub report: AttestationReport,
-    /// The evidence to verify the attestation report's signature.
-    pub signer: ReportSigner,
+#[derive(Serialize, Deserialize)]
+pub struct AttestationReportV1 {
+    /// The tee info generated by the firmware.
+    pub tee_info: TeeInfoV1,
+    /// The tee's evidence to verify the tee info's signature.
+    pub signer: TeeInfoSigner,
+    #[serde(with = "BigArray")]
     /// Padding bits to meet the memory page alignment.
     reserved: [u8; 4096
-        - (std::mem::size_of::<AttestationReport>() + std::mem::size_of::<ReportSigner>())],
+        - (std::mem::size_of::<TeeInfoV1>() + std::mem::size_of::<TeeInfoSigner>())],
 }
 
 // Compile-time check that the size is what is expected.
-const_assert!(std::mem::size_of::<ReportRsp>() == 4096);
+const_assert!(std::mem::size_of::<AttestationReportV1>() == 4096);
 
-impl Default for ReportRsp {
+impl Default for AttestationReportV1 {
     fn default() -> Self {
         Self {
-            report: Default::default(),
+            tee_info: Default::default(),
             signer: Default::default(),
             reserved: [0u8; 4096
-                - (std::mem::size_of::<AttestationReport>() + std::mem::size_of::<ReportSigner>())],
+                - (std::mem::size_of::<TeeInfoV1>() + std::mem::size_of::<TeeInfoSigner>())],
         }
     }
 }
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-pub struct Body {
-    pub user_pubkey_digest: [u8; 32],
-    pub vm_id: [u8; 16],
-    pub vm_version: [u8; 16],
-    #[serde(with = "BigArray")]
-    pub report_data: [u8; 64],
-    pub mnonce: [u8; 16],
-    pub measure: [u8; 32],
-    pub policy: GuestPolicy,
+impl TryFrom<&[u8]> for AttestationReportV1 {
+    type Error = std::io::Error;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        bincode::deserialize(bytes).map_err(|e| {
+            std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("Failed to deserialize AttestationReportV1: {}", e),
+            )
+        })
+    }
 }
 
-impl Default for Body {
+/// The response from the PSP containing the generated extended attestation
+/// report.
+///
+/// The Report is padded to exactly 4096 Bytes to make sure the page size
+/// matches.
+#[repr(C)]
+#[derive(Serialize, Deserialize)]
+pub struct AttestationReportV2 {
+    /// The tee info generated by the firmware.
+    pub tee_info: TeeInfoV2,
+    /// The tee's evidence to verify the tee info's signature.
+    pub signer: TeeInfoSigner,
+    /// Padding bits to meet the memory page alignment.
+    #[serde(with = "BigArray")]
+    reserved: [u8; 4096
+        - (std::mem::size_of::<TeeInfoV2>() + std::mem::size_of::<TeeInfoSigner>())],
+}
+
+// Compile-time check that the size is what is expected.
+const_assert!(std::mem::size_of::<AttestationReportV2>() == 4096);
+
+impl Default for AttestationReportV2 {
+    fn default() -> Self {
+        Self {
+            tee_info: Default::default(),
+            signer: Default::default(),
+            reserved: [0u8; 4096
+                - (std::mem::size_of::<TeeInfoV2>() + std::mem::size_of::<TeeInfoSigner>())],
+        }
+    }
+}
+
+impl TryFrom<&[u8]> for AttestationReportV2 {
+    type Error = std::io::Error;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        bincode::deserialize(bytes).map_err(|e| {
+            std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("Failed to deserialize AttestationReportV2: {}", e),
+            )
+        })
+    }
+}
+
+/// Enum Containing the different versions of the Tee Info struct
+///
+/// Since the release of the firmware API version 1.4, the tee info of the
+/// attestation report support extended format. In order to keep backwards
+/// compatibility, use enum V1(TeeInfoV1) to handling legacy tee info of the
+/// attestation report.
+///
+/// The V2(TeeInfoV2) is tee info struct for extended attestation report.
+pub enum TeeInfo<'a> {
+    /// Version 1 of Tee info
+    V1(&'a TeeInfoV1),
+    /// Version 2 of Tee info
+    V2(&'a TeeInfoV2),
+}
+
+impl<'a> TeeInfo<'a> {
+    /// Get user_pubkey_digest field
+    pub fn user_pubkey_digest(&self) -> &[u8] {
+        match self {
+            &Self::V1(tee_info) => &tee_info.user_pubkey_digest[..],
+            &Self::V2(tee_info) => &tee_info.user_pubkey_digest[..],
+        }
+    }
+
+    /// Get vm_id field
+    pub fn vm_id(&self) -> &[u8] {
+        match self {
+            &Self::V1(tee_info) => &tee_info.vm_id[..],
+            &Self::V2(tee_info) => &tee_info.vm_id[..],
+        }
+    }
+
+    /// Get vm_version field
+    pub fn vm_version(&self) -> &[u8] {
+        match self {
+            &Self::V1(tee_info) => &tee_info.vm_version[..],
+            &Self::V2(tee_info) => &tee_info.vm_version[..],
+        }
+    }
+
+    /// Get report_data field
+    pub fn report_data(&self) -> &[u8] {
+        match self {
+            &Self::V1(tee_info) => &tee_info.report_data[..],
+            &Self::V2(tee_info) => &tee_info.report_data[..],
+        }
+    }
+
+    /// Get mnonce field
+    pub fn mnonce(&self) -> &[u8] {
+        match self {
+            &Self::V1(tee_info) => &tee_info.mnonce[..],
+            &Self::V2(tee_info) => &tee_info.mnonce[..],
+        }
+    }
+
+    /// Get measure field
+    pub fn measure(&self) -> &[u8] {
+        match self {
+            &Self::V1(tee_info) => &tee_info.measure[..],
+            &Self::V2(tee_info) => &tee_info.measure[..],
+        }
+    }
+
+    /// Get policy field
+    pub fn policy(&self) -> GuestPolicy {
+        match self {
+            &Self::V1(tee_info) => tee_info.policy,
+            &Self::V2(tee_info) => tee_info.policy,
+        }
+    }
+
+    /// Get sig_usage field
+    pub fn sig_usage(&self) -> u32 {
+        match self {
+            &Self::V1(tee_info) => tee_info.sig_usage,
+            &Self::V2(tee_info) => tee_info.sig_usage,
+        }
+    }
+
+    /// Get sig_algo field
+    pub fn sig_algo(&self) -> u32 {
+        match self {
+            &Self::V1(tee_info) => tee_info.sig_algo,
+            &Self::V2(tee_info) => tee_info.sig_algo,
+        }
+    }
+
+    /// Get anonce field
+    pub fn anonce(&self) -> u32 {
+        match self {
+            &Self::V1(tee_info) => tee_info.anonce,
+            &Self::V2(_) => 0,
+        }
+    }
+
+    /// Get build field
+    pub fn build(&self) -> u32 {
+        match self {
+            &Self::V1(_) => 0,
+            &Self::V2(tee_info) => tee_info.build,
+        }
+    }
+
+    /// Get rtmr_version field
+    pub fn rtmr_version(&self) -> u16 {
+        match self {
+            &Self::V1(_) => 0,
+            &Self::V2(tee_info) => tee_info.rtmr_version,
+        }
+    }
+
+    /// Get rtmr0 field
+    pub fn rtmr0(&self) -> &[u8] {
+        match self {
+            &Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
+            &Self::V2(tee_info) => &tee_info.rtmr0,
+        }
+    }
+
+    /// Get rtmr1 field
+    pub fn rtmr1(&self) -> &[u8] {
+        match self {
+            &Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
+            &Self::V2(tee_info) => &tee_info.rtmr1,
+        }
+    }
+
+    /// Get rtmr2 field
+    pub fn rtmr2(&self) -> &[u8] {
+        match self {
+            &Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
+            &Self::V2(tee_info) => &tee_info.rtmr2,
+        }
+    }
+
+    /// Get rtmr3 field
+    pub fn rtmr3(&self) -> &[u8] {
+        match self {
+            &Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
+            &Self::V2(tee_info) => &tee_info.rtmr3,
+        }
+    }
+
+    /// Get rtmr4 field
+    pub fn rtmr4(&self) -> &[u8] {
+        match self {
+            &Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
+            &Self::V2(tee_info) => &tee_info.rtmr4,
+        }
+    }
+}
+
+
+impl<'a> TryFrom<&'a TeeInfo<'a>> for Signature {
+    type Error = std::io::Error;
+
+    #[inline]
+    fn try_from(value: &'a TeeInfo<'a>) -> Result<Self, std::io::Error> {
+        match value {
+            &TeeInfo::V1(v1) => {
+                let sig = Vec::try_from(&v1.sig)?;
+                Ok(Self {
+                    sig,
+                    id: None,
+                    usage: Usage::PEK.into(),
+                    algo: None,
+                })
+            }
+            &TeeInfo::V2(v2) => {
+                let sig = Vec::try_from(&v2.sig)?;
+                Ok(Self {
+                    sig,
+                    id: None,
+                    usage: Usage::PEK.into(),
+                    algo: None,
+                })
+            }
+        }
+    }
+}
+
+impl<'a> Verifiable for (&'a Certificate, &'a TeeInfo<'a>) {
+    type Output = ();
+
+    fn verify(self) -> Result<(), std::io::Error> {
+        let (cert, tee_info) = self;
+        let key: PublicKey = cert.try_into()?;
+        let sig: Signature = tee_info.try_into()?;
+
+        match tee_info {
+            &TeeInfo::V1(v1) => {
+                key.verify(
+                    v1,
+                    &self.0.body.data.user_id[..self.0.body.data.uid_size as usize],
+                    &sig,
+                )
+            }
+            &TeeInfo::V2(v2) => {
+                key.verify(
+                    v2,
+                    &self.0.body.data.user_id[..self.0.body.data.uid_size as usize],
+                    &sig,
+                )
+            }
+        }
+    }
+}
+
+/// Data provieded by the guest owner for requesting an attestation report
+/// from the HYGON Secure Processor.
+#[repr(C)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TeeInfoV1 {
+    /// Pubkey digest of the session used to secure communication between
+    /// user/hypervisor and PSP.
+    pub user_pubkey_digest: [u8; 32],
+    /// The identifier of the VM custommized by the guest owner.
+    pub vm_id: [u8; 16],
+    /// The version info of the VM customized by the guest owner.
+    pub vm_version: [u8; 16],
+    #[serde(with = "BigArray")]
+    /// The challenge data for the attestation.
+    pub report_data: [u8; 64],
+    /// The random nonce generated by user to protect struct TeeInfoSigner.
+    pub mnonce: [u8; 16],
+    /// The launch digest of the VM.
+    pub measure: [u8; 32],
+    /// The running policy of the VM.
+    pub policy: GuestPolicy,
+    /// The usage of the signature.
+    pub sig_usage: u32,
+    /// The algorithm of the signature.
+    pub sig_algo: u32,
+    /// The random nonce generated by firmware to tweak the attestation report.
+    pub anonce: u32,
+    /// The signature for the fields:
+    ///   user_pubkey_digest,
+    ///   vm_id,
+    ///   vm_version,
+    ///   report_data,
+    ///   mnonce,
+    ///   measure,
+    ///   policy,
+    pub sig: ecdsa::Signature,
+}
+
+// Compile-time check that the size is what is expected.
+const_assert!(std::mem::size_of::<TeeInfoV1>() == 0x150);
+
+impl Default for TeeInfoV1 {
     fn default() -> Self {
         Self {
             user_pubkey_digest: Default::default(),
@@ -124,26 +577,6 @@ impl Default for Body {
             mnonce: Default::default(),
             measure: Default::default(),
             policy: Default::default(),
-        }
-    }
-}
-
-/// Data provieded by the guest owner for requesting an attestation report
-/// from the HYGON Secure Processor.
-#[repr(C)]
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AttestationReport {
-    pub body: Body,
-    pub sig_usage: u32,
-    pub sig_algo: u32,
-    pub anonce: u32,
-    pub sig: ecdsa::Signature,
-}
-
-impl Default for AttestationReport {
-    fn default() -> Self {
-        Self {
-            body: Default::default(),
             sig_usage: Default::default(),
             sig_algo: Default::default(),
             anonce: Default::default(),
@@ -152,40 +585,139 @@ impl Default for AttestationReport {
     }
 }
 
-impl codicon::Encoder<crate::Body> for AttestationReport {
+impl codicon::Encoder<crate::Body> for TeeInfoV1 {
     type Error = std::io::Error;
 
     fn encode(&self, mut writer: impl Write, _: crate::Body) -> Result<(), std::io::Error> {
-        writer.save(&self.body)
+        writer.save(&self.user_pubkey_digest)?;
+        writer.save(&self.vm_id)?;
+        writer.save(&self.vm_version)?;
+        writer.save(&self.report_data)?;
+        writer.save(&self.mnonce)?;
+        writer.save(&self.measure)?;
+        writer.save(&self.policy)?;
+        Ok(())
     }
 }
 
-impl TryFrom<&AttestationReport> for Signature {
+/// Data provieded by the guest owner for requesting an extended attestation
+/// report from the HYGON Secure Processor.
+#[repr(C)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TeeInfoV2 {
+    /// Pubkey digest of the session used to secure communication between
+    /// user/hypervisor and PSP.
+    pub user_pubkey_digest: [u8; 32],
+    /// The identifier of the VM custommized by the guest owner.
+    pub vm_id: [u8; 16],
+    /// The version info of the VM customized by the guest owner.
+    pub vm_version: [u8; 16],
+    #[serde(with = "BigArray")]
+    /// The challenge data for the attestation.
+    pub report_data: [u8; 64],
+    /// The random nonce generated by user to protect struct TeeInfoSigner.
+    pub mnonce: [u8; 16],
+    /// The launch digest of the VM.
+    pub measure: [u8; 32],
+    /// The running policy of the VM.
+    pub policy: GuestPolicy,
+    /// The usage of the signature.
+    pub sig_usage: u32,
+    /// The algorithm of the signature.
+    pub sig_algo: u32,
+    /// The version of the firmware's build.
+    pub build: u32,
+    /// The version of the VM's rtmr.
+    pub rtmr_version: u16,
+    /// A reserved field, for future use.
+    pub reserved0: [u8; 14],
+    /// The rtmr register 0, it's always equals to @measure field.
+    pub rtmr0: [u8; CSV_RTMR_REG_SIZE],
+    /// The rtmr register 1.
+    pub rtmr1: [u8; CSV_RTMR_REG_SIZE],
+    /// The rtmr register 2.
+    pub rtmr2: [u8; CSV_RTMR_REG_SIZE],
+    /// The rtmr register 3.
+    pub rtmr3: [u8; CSV_RTMR_REG_SIZE],
+    /// The rtmr register 4.
+    pub rtmr4: [u8; CSV_RTMR_REG_SIZE],
+    #[serde(with = "BigArray")]
+    /// A reserved field, for future use.
+    pub reserved1: [u8; 656],
+    /// The signature for the fields:
+    ///   user_pubkey_digest,
+    ///   vm_id,
+    ///   vm_version,
+    ///   report_data,
+    ///   mnonce,
+    ///   measure,
+    ///   policy,
+    ///   sig_usage,
+    ///   sig_algo,
+    ///   build,
+    ///   rtmr_version,
+    ///   reserved0,
+    ///   rtmr0,
+    ///   rtmr1,
+    ///   rtmr2,
+    ///   rtmr3,
+    ///   rtmr4,
+    ///   reserved1,
+    pub sig: ecdsa::Signature,
+}
+
+// Compile-time check that the size is what is expected.
+const_assert!(std::mem::size_of::<TeeInfoV2>() == 0x490);
+
+impl Default for TeeInfoV2 {
+    fn default() -> Self {
+        Self {
+            user_pubkey_digest: Default::default(),
+            vm_id: Default::default(),
+            vm_version: Default::default(),
+            report_data: [0u8; 64],
+            mnonce: Default::default(),
+            measure: Default::default(),
+            policy: Default::default(),
+            sig_usage: Default::default(),
+            sig_algo: Default::default(),
+            build: Default::default(),
+            rtmr_version: Default::default(),
+            reserved0: Default::default(),
+            rtmr0: [0u8; CSV_RTMR_REG_SIZE],
+            rtmr1: [0u8; CSV_RTMR_REG_SIZE],
+            rtmr2: [0u8; CSV_RTMR_REG_SIZE],
+            rtmr3: [0u8; CSV_RTMR_REG_SIZE],
+            rtmr4: [0u8; CSV_RTMR_REG_SIZE],
+            reserved1: [0u8; 656],
+            sig: Default::default(),
+        }
+    }
+}
+
+impl codicon::Encoder<crate::Body> for TeeInfoV2 {
     type Error = std::io::Error;
 
-    #[inline]
-    fn try_from(value: &AttestationReport) -> Result<Self, std::io::Error> {
-        let sig = Vec::try_from(&value.sig)?;
-        Ok(Self {
-            sig,
-            id: None,
-            usage: Usage::PEK.into(),
-            algo: None,
-        })
-    }
-}
-
-impl Verifiable for (&Certificate, &AttestationReport) {
-    type Output = ();
-
-    fn verify(self) -> Result<(), std::io::Error> {
-        let key: PublicKey = self.0.try_into()?;
-        let sig: Signature = self.1.try_into()?;
-        key.verify(
-            self.1,
-            &self.0.body.data.user_id[..self.0.body.data.uid_size as usize],
-            &sig,
-        )
+    fn encode(&self, mut writer: impl Write, _: crate::Body) -> Result<(), std::io::Error> {
+        writer.save(&self.user_pubkey_digest)?;
+        writer.save(&self.vm_id)?;
+        writer.save(&self.vm_version)?;
+        writer.save(&self.report_data)?;
+        writer.save(&self.mnonce)?;
+        writer.save(&self.measure)?;
+        writer.save(&self.policy)?;
+        writer.save(&self.sig_usage)?;
+        writer.save(&self.sig_algo)?;
+        writer.save(&self.build)?;
+        writer.save(&self.rtmr_version)?;
+        writer.save(&self.reserved0)?;
+        writer.save(&self.rtmr0)?;
+        writer.save(&self.rtmr1)?;
+        writer.save(&self.rtmr2)?;
+        writer.save(&self.rtmr3)?;
+        writer.save(&self.rtmr4)?;
+        writer.save(&self.reserved1)?;
+        Ok(())
     }
 }
 
@@ -239,7 +771,7 @@ impl GuestPolicy {
 
 #[repr(C)]
 #[derive(Serialize, Deserialize)]
-pub struct ReportSigner {
+pub struct TeeInfoSigner {
     #[serde(with = "BigArray")]
     pub pek_cert: [u8; 2084],
     #[serde(with = "BigArray")]
@@ -259,7 +791,7 @@ fn xor_with_anonce(data: &mut [u8], anonce: &u32) -> Result<(), Error> {
     Ok(())
 }
 
-impl ReportSigner {
+impl TeeInfoSigner {
     /// Verifies the signature evidence's hmac.
     pub fn verify(
         &mut self,
@@ -302,7 +834,7 @@ impl ReportSigner {
     }
 }
 
-impl Default for ReportSigner {
+impl Default for TeeInfoSigner {
     fn default() -> Self {
         Self {
             pek_cert: [0u8; 2084],
