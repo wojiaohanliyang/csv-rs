@@ -13,7 +13,6 @@ use log::*;
 use serde::{Deserialize, Serialize};
 use std::ffi::c_void;
 use std::io::Write;
-use serde_bytes::ByteBuf;
 use hex::encode;
 
 /// A structure representing the body of an attestation report.

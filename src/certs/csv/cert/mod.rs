@@ -11,10 +11,8 @@ use crate::{
     crypto::{self, key::ecc, sig::ecdsa, sm, PrivateKey, PublicKey, Signature},
     util::*,
 };
-use log::*;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
-use std::env;
 use std::io::{Error, ErrorKind, Read, Result, Write};
 
 #[repr(C)]

@@ -34,6 +34,7 @@ pub const DCU_GET_REPORT: Ioctl<WriteRead, &MkfdIoctlSecurityAttestationArgs> =
 pub struct MkfdIoctlSecurityAttestationArgs {
     /// DCU identifier for target device
     pub dcu_id: u32,
+    /// For compatibility
     pub cmd_id :u32,
     /// Message version number(default 1)
     pub version: u32,
@@ -55,7 +56,6 @@ impl MkfdIoctlSecurityAttestationArgs {
     pub fn new() -> Self {
         Self {
             dcu_id: 0,
-            ///attestation command
             cmd_id: 0,
             version: 1,
             request_data: std::ptr::null_mut(),
