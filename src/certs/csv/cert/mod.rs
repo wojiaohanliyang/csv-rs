@@ -334,7 +334,7 @@ pub async fn download_hskcek(
     // Convert serial number bytes to string and trim null terminator
     let chip_id = std::str::from_utf8(sn)?.trim_end_matches('\0');
     let kds_url = format!("https://cert.hygon.cn/hsk_cek?snumber={chip_id}");
-    trace!("kds_url: {}", kds_url);
+    log::trace!("kds_url: {}", kds_url);
     // Create async HTTP client (recommend reusing client in production)
     let response = reqwest::Client::new()
         .get(&kds_url)
@@ -353,7 +353,8 @@ pub async fn get_certificate_data(
     chip_id: &[u8; 16],
 ) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
     // 1. Get certificate directory path (from env var or use default)
-    let cert_dir = env::var("HSK_CEK_CERT_PATH").unwrap_or_else(|_| "/opt/dcu/certs".to_string());
+    let cert_dir =
+        std::env::var("HSK_CEK_CERT_PATH").unwrap_or_else(|_| "/opt/dcu/certs".to_string());
 
     // 2.Convert chip_id to string
     let chip_id_str =
@@ -364,10 +365,10 @@ pub async fn get_certificate_data(
 
     // 4. Check file existence and read or download
     if tokio::fs::metadata(&cert_path).await.is_ok() {
-        debug!("Reading certificate from: {}", cert_path);
+        log::debug!("Reading certificate from: {}", cert_path);
         tokio::fs::read(cert_path).await.map_err(Into::into)
     } else {
-        debug!(
+        log::debug!(
             "Certificate not found at {}, attempting download",
             cert_path
         );
