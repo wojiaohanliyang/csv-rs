@@ -334,58 +334,71 @@ pub enum TeeInfo<'a> {
 }
 
 impl<'a> TeeInfo<'a> {
+    /// Restore raw field from the Tee info
+    pub fn raw(&self, data: &[u8]) -> Vec<u8> {
+        let mut data_bytes = data.to_vec();
+
+        let anonce_bytes = self.anonce().to_le_bytes();
+
+        for (index, item) in data_bytes.iter_mut().enumerate() {
+            *item ^= anonce_bytes[index % 4];
+        }
+
+        data_bytes
+    }
+
     /// Get user_pubkey_digest field
-    pub fn user_pubkey_digest(&self) -> &[u8] {
+    pub fn user_pubkey_digest(&self) -> Vec<u8> {
         match self {
-            &Self::V1(tee_info) => &tee_info.user_pubkey_digest[..],
-            &Self::V2(tee_info) => &tee_info.user_pubkey_digest[..],
+            &Self::V1(tee_info) => self.raw(&tee_info.user_pubkey_digest[..]),
+            &Self::V2(tee_info) => tee_info.user_pubkey_digest.to_vec(),
         }
     }
 
     /// Get vm_id field
-    pub fn vm_id(&self) -> &[u8] {
+    pub fn vm_id(&self) -> Vec<u8> {
         match self {
-            &Self::V1(tee_info) => &tee_info.vm_id[..],
-            &Self::V2(tee_info) => &tee_info.vm_id[..],
+            &Self::V1(tee_info) => self.raw(&tee_info.vm_id[..]),
+            &Self::V2(tee_info) => tee_info.vm_id.to_vec(),
         }
     }
 
     /// Get vm_version field
-    pub fn vm_version(&self) -> &[u8] {
+    pub fn vm_version(&self) -> Vec<u8> {
         match self {
-            &Self::V1(tee_info) => &tee_info.vm_version[..],
-            &Self::V2(tee_info) => &tee_info.vm_version[..],
+            &Self::V1(tee_info) => self.raw(&tee_info.vm_version[..]),
+            &Self::V2(tee_info) => tee_info.vm_version.to_vec(),
         }
     }
 
     /// Get report_data field
-    pub fn report_data(&self) -> &[u8] {
+    pub fn report_data(&self) -> Vec<u8> {
         match self {
-            &Self::V1(tee_info) => &tee_info.report_data[..],
-            &Self::V2(tee_info) => &tee_info.report_data[..],
+            &Self::V1(tee_info) => self.raw(&tee_info.report_data[..]),
+            &Self::V2(tee_info) => tee_info.report_data.to_vec(),
         }
     }
 
     /// Get mnonce field
-    pub fn mnonce(&self) -> &[u8] {
+    pub fn mnonce(&self) -> Vec<u8> {
         match self {
-            &Self::V1(tee_info) => &tee_info.mnonce[..],
-            &Self::V2(tee_info) => &tee_info.mnonce[..],
+            &Self::V1(tee_info) => self.raw(&tee_info.mnonce[..]),
+            &Self::V2(tee_info) => tee_info.mnonce.to_vec(),
         }
     }
 
     /// Get measure field
-    pub fn measure(&self) -> &[u8] {
+    pub fn measure(&self) -> Vec<u8> {
         match self {
-            &Self::V1(tee_info) => &tee_info.measure[..],
-            &Self::V2(tee_info) => &tee_info.measure[..],
+            &Self::V1(tee_info) => self.raw(&tee_info.measure[..]),
+            &Self::V2(tee_info) => tee_info.measure.to_vec(),
         }
     }
 
     /// Get policy field
     pub fn policy(&self) -> GuestPolicy {
         match self {
-            &Self::V1(tee_info) => tee_info.policy,
+            &Self::V1(tee_info) => tee_info.policy.xor(&self.anonce()),
             &Self::V2(tee_info) => tee_info.policy,
         }
     }
@@ -393,7 +406,7 @@ impl<'a> TeeInfo<'a> {
     /// Get sig_usage field
     pub fn sig_usage(&self) -> u32 {
         match self {
-            &Self::V1(tee_info) => tee_info.sig_usage,
+            &Self::V1(tee_info) => tee_info.sig_usage ^ self.anonce(),
             &Self::V2(tee_info) => tee_info.sig_usage,
         }
     }
@@ -401,7 +414,7 @@ impl<'a> TeeInfo<'a> {
     /// Get sig_algo field
     pub fn sig_algo(&self) -> u32 {
         match self {
-            &Self::V1(tee_info) => tee_info.sig_algo,
+            &Self::V1(tee_info) => tee_info.sig_algo ^ self.anonce(),
             &Self::V2(tee_info) => tee_info.sig_algo,
         }
     }
