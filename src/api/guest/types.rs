@@ -96,7 +96,7 @@ impl Default for ReportReqExt {
     fn default() -> Self {
         Self {
             data: [0u8; 64],
-            mnonce : [0u8; 16],
+            mnonce: [0u8; 16],
             hash: [0u8; 32],
             magic: ATTESTATION_EXT_MAGIC,
             flags: 0,
@@ -147,7 +147,7 @@ pub struct AttestationReportWrapper {
 }
 
 impl AttestationReportWrapper {
-    pub fn new(magic: [u8; 16], flags: u32, report: &mut [u8] ) -> Self {
+    pub fn new(magic: [u8; 16], flags: u32, report: &mut [u8]) -> Self {
         let mut bytes = [0u8; 4096];
 
         let copy_len = std::cmp::min(report.len(), 4096);
@@ -193,12 +193,10 @@ impl TryFrom<&AttestationReportWrapper> for AttestationReport {
                 let report_v2: AttestationReportV2 = TryFrom::try_from(&report_wrapper.data[..])?;
                 Ok(AttestationReport::V2(report_v2))
             }
-            _ => {
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Invalid AttestationReport")
-                ))
-            }
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Invalid AttestationReport"),
+            )),
         }
     }
 }
@@ -242,8 +240,8 @@ pub struct AttestationReportV1 {
     pub signer: TeeInfoSigner,
     #[serde(with = "BigArray")]
     /// Padding bits to meet the memory page alignment.
-    reserved: [u8; 4096
-        - (std::mem::size_of::<TeeInfoV1>() + std::mem::size_of::<TeeInfoSigner>())],
+    reserved:
+        [u8; 4096 - (std::mem::size_of::<TeeInfoV1>() + std::mem::size_of::<TeeInfoSigner>())],
 }
 
 // Compile-time check that the size is what is expected.
@@ -266,8 +264,8 @@ impl TryFrom<&[u8]> for AttestationReportV1 {
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         bincode::deserialize(bytes).map_err(|e| {
             std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("Failed to deserialize AttestationReportV1: {}", e),
+                std::io::ErrorKind::InvalidData,
+                format!("Failed to deserialize AttestationReportV1: {}", e),
             )
         })
     }
@@ -287,8 +285,8 @@ pub struct AttestationReportV2 {
     pub signer: TeeInfoSigner,
     /// Padding bits to meet the memory page alignment.
     #[serde(with = "BigArray")]
-    reserved: [u8; 4096
-        - (std::mem::size_of::<TeeInfoV2>() + std::mem::size_of::<TeeInfoSigner>())],
+    reserved:
+        [u8; 4096 - (std::mem::size_of::<TeeInfoV2>() + std::mem::size_of::<TeeInfoSigner>())],
 }
 
 // Compile-time check that the size is what is expected.
@@ -311,8 +309,8 @@ impl TryFrom<&[u8]> for AttestationReportV2 {
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         bincode::deserialize(bytes).map_err(|e| {
             std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("Failed to deserialize AttestationReportV2: {}", e),
+                std::io::ErrorKind::InvalidData,
+                format!("Failed to deserialize AttestationReportV2: {}", e),
             )
         })
     }
@@ -484,7 +482,6 @@ impl<'a> TeeInfo<'a> {
     }
 }
 
-
 impl<'a> TryFrom<&'a TeeInfo<'a>> for Signature {
     type Error = std::io::Error;
 
@@ -522,20 +519,16 @@ impl<'a> Verifiable for (&'a Certificate, &'a TeeInfo<'a>) {
         let sig: Signature = tee_info.try_into()?;
 
         match tee_info {
-            &TeeInfo::V1(v1) => {
-                key.verify(
-                    v1,
-                    &self.0.body.data.user_id[..self.0.body.data.uid_size as usize],
-                    &sig,
-                )
-            }
-            &TeeInfo::V2(v2) => {
-                key.verify(
-                    v2,
-                    &self.0.body.data.user_id[..self.0.body.data.uid_size as usize],
-                    &sig,
-                )
-            }
+            &TeeInfo::V1(v1) => key.verify(
+                v1,
+                &self.0.body.data.user_id[..self.0.body.data.uid_size as usize],
+                &sig,
+            ),
+            &TeeInfo::V2(v2) => key.verify(
+                v2,
+                &self.0.body.data.user_id[..self.0.body.data.uid_size as usize],
+                &sig,
+            ),
         }
     }
 }

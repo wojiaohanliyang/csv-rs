@@ -46,7 +46,6 @@ impl<'a> GuestReportRequest<'a> {
     }
 }
 
-
 /// ////////////////////// Rtmr operations ioctl interface /////////////////////
 
 pub const CSV_RTMR_REQ: Ioctl<WriteRead, &GuestRtmrRequest> =

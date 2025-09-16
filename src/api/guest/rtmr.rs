@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::{io::{Error, ErrorKind}, ptr};
+use std::{
+    io::{Error, ErrorKind},
+    ptr,
+};
 
 pub const CSV_RTMR_VERSION_MAX: u16 = 1;
 pub const CSV_RTMR_VERSION_MIN: u16 = 1;
@@ -58,9 +61,7 @@ pub struct CsvGuestUserRtmrStart {
 impl CsvGuestUserRtmrStart {
     /// Create a new rtmr_start request.
     pub fn new(version: u16) -> Self {
-        Self {
-            version: version,
-        }
+        Self { version: version }
     }
 }
 
@@ -125,7 +126,7 @@ impl CsvGuestUserRtmrExtend {
         if data.len() < CSV_RTMR_EXTEND_LEN {
             Err(Error::new(
                 ErrorKind::InvalidInput,
-                format!("invalid length: expected >= {}", CSV_RTMR_EXTEND_LEN)
+                format!("invalid length: expected >= {}", CSV_RTMR_EXTEND_LEN),
             ))
         } else {
             let mut array = [0u8; CSV_RTMR_EXTEND_LEN];
