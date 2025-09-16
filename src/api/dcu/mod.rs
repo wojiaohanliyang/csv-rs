@@ -199,7 +199,7 @@ pub fn verify_report(
 }
 
 /// Saves certificates to local files
-fn save_certificates(
+pub fn save_certificates(
     hsk: &ca::Certificate,
     cek: &csv::Certificate,
     hrk: &ca::Certificate,

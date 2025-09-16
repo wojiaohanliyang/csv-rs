@@ -63,7 +63,7 @@ impl TryFrom<&crypto::Signature> for Signatures {
 
     #[inline]
     fn try_from(value: &crypto::Signature) -> Result<Self> {
-        let algo = value.algo.unwrap_or_else(|| Algorithm::NONE);
+        let algo = value.algo.unwrap_or(Algorithm::NONE);
         Ok(Signatures {
             usage: value.usage,
             algo,
@@ -149,10 +149,10 @@ impl Signer<Certificate> for PrivateKey<Usage> {
         let mut msg: Vec<u8> = Vec::new();
         msg.save(&target.body)?;
 
-        let sig = sm::SM2::sign(self.key, &uid.as_bytes().to_vec(), &msg)?;
+        let sig = sm::SM2::sign(self.key, uid.as_bytes(), &msg)?;
 
         let sig = crate::crypto::Signature {
-            usage: self.usage.into(),
+            usage: self.usage,
             sig,
             algo: Some(self.usage.try_into()?),
             id: self.id,
@@ -278,11 +278,10 @@ impl Body {
             String::try_from(usage)?
         };
 
-        let uid_size = if let Some(u16_value) = uid.len().try_into().ok() {
-            u16_value
-        } else {
+        let Ok(uid_size) = uid.len().try_into() else {
             return Err(ErrorKind::InvalidInput.into());
         };
+
         let mut user_id_vec = Vec::from(uid.as_bytes());
         user_id_vec.resize(254, 0);
         let mut user_id: [u8; 254] = [0; 254];

@@ -64,7 +64,7 @@ impl CsvGuest {
         // Copy bytes from report_request to report_response
         response_bytes[..request_bytes.len()].copy_from_slice(request_bytes);
 
-        let mut guest_report_request = GuestReportRequest::new(response_bytes.as_ref());
+        let mut guest_report_request = GuestReportRequest::new(response_bytes);
 
         CSV_GET_REPORT.ioctl(&mut self.0, &mut guest_report_request)?;
 
@@ -92,7 +92,7 @@ impl CsvGuest {
         mnonce: Option<[u8; 16]>,
         flags: u32,
     ) -> Result<AttestationReportWrapper, Error> {
-        if self.check_attestation_report_v2_supported() == false {
+        if !self.check_attestation_report_v2_supported() {
             self.get_report(data, mnonce)
         } else if flags == 0 {
             // If flags is 0, generate AttestationReportV1.
@@ -126,7 +126,7 @@ impl CsvGuest {
             // Copy bytes from report_request_ext to report_response_ext
             response_bytes[..request_bytes.len()].copy_from_slice(request_bytes);
 
-            let mut guest_report_request = GuestReportRequest::new(response_bytes.as_ref());
+            let mut guest_report_request = GuestReportRequest::new(response_bytes);
 
             CSV_GET_REPORT.ioctl(&mut self.0, &mut guest_report_request)?;
 
@@ -154,7 +154,7 @@ impl CsvGuest {
         };
 
         let mut rtmr_request =
-            GuestRtmrRequest::new(rtmr_status_bytes.as_ref(), CsvGuestUserRtmrSubcmd::Status);
+            GuestRtmrRequest::new(rtmr_status_bytes, CsvGuestUserRtmrSubcmd::Status);
 
         match CSV_RTMR_REQ.ioctl(&mut self.0, &mut rtmr_request) {
             Ok(return_code) => {
@@ -194,7 +194,7 @@ impl CsvGuest {
         };
 
         let mut rtmr_request =
-            GuestRtmrRequest::new(rtmr_start_bytes.as_ref(), CsvGuestUserRtmrSubcmd::Start);
+            GuestRtmrRequest::new(rtmr_start_bytes, CsvGuestUserRtmrSubcmd::Start);
 
         match CSV_RTMR_REQ.ioctl(&mut self.0, &mut rtmr_request) {
             Ok(return_code) => {
@@ -236,7 +236,7 @@ impl CsvGuest {
             CsvGuestUserRtmrRead::allocate_with_capacity(bitmap, num_regs);
 
         let mut rtmr_request =
-            GuestRtmrRequest::new(&_buffer.as_ref(), CsvGuestUserRtmrSubcmd::Read);
+            GuestRtmrRequest::new(_buffer.as_ref(), CsvGuestUserRtmrSubcmd::Read);
 
         match CSV_RTMR_REQ.ioctl(&mut self.0, &mut rtmr_request) {
             Ok(return_code) => {
@@ -277,7 +277,7 @@ impl CsvGuest {
         };
 
         let mut rtmr_request =
-            GuestRtmrRequest::new(rtmr_extend_bytes.as_ref(), CsvGuestUserRtmrSubcmd::Extend);
+            GuestRtmrRequest::new(rtmr_extend_bytes, CsvGuestUserRtmrSubcmd::Extend);
 
         match CSV_RTMR_REQ.ioctl(&mut self.0, &mut rtmr_request) {
             Ok(return_code) => {

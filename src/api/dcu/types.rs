@@ -58,7 +58,7 @@ impl Body {
     pub fn print_fields(&self) {
         trace!("Version: {}", self.version);
         trace!("Chip ID: {}", String::from_utf8_lossy(&self.chip_id));
-        trace!("User data: {}", encode(&self.user_data));
+        trace!("User data: {}", encode(self.user_data));
         trace!("Measure: {:?}", self.measure);
         trace!("Signature Usage: {}", self.sig_usage);
         trace!("Signature Algorithm: {}", self.sig_algo);

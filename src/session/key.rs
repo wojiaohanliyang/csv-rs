@@ -80,7 +80,7 @@ impl Key {
         prepend.push(cat_symbol);
         prepend.extend_from_slice(ctx);
         let hbytes = 32; //sha
-        let mut out = Key::zeroed((size + hbytes - 1) / hbytes * hbytes);
+        let mut out = Key::zeroed(size.div_ceil(hbytes) * hbytes);
         let buf = &mut out[..];
 
         crate::crypto::sm::SM2::ecdh_kdf_x9_63(&mut buf[..], &prepend[..])?;

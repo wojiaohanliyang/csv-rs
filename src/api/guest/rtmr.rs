@@ -20,7 +20,7 @@ pub const CSV_RTMR_REG_INDEX_MAX: usize = CSV_RTMR_REG_NUM - 1;
 #[repr(u16)]
 pub enum CsvGuestUserRtmrSubcmd {
     Status = 0x1,
-    Start = 02,
+    Start = 0x2,
     Read = 0x3,
     Extend = 0x4,
 }
@@ -33,7 +33,7 @@ pub enum CsvGuestRtmrStatus {
 }
 
 #[repr(C, packed)]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CsvGuestUserRtmrStatus {
     /// The rtmr version used in the guest.
     pub version: u16,
@@ -44,10 +44,7 @@ pub struct CsvGuestUserRtmrStatus {
 impl CsvGuestUserRtmrStatus {
     /// Create a new rtmr_status request.
     pub fn new() -> Self {
-        Self {
-            version: 0,
-            state: 0,
-        }
+        Self::default()
     }
 }
 
@@ -61,7 +58,7 @@ pub struct CsvGuestUserRtmrStart {
 impl CsvGuestUserRtmrStart {
     /// Create a new rtmr_start request.
     pub fn new(version: u16) -> Self {
-        Self { version: version }
+        Self { version }
     }
 }
 
@@ -77,7 +74,7 @@ pub struct CsvGuestUserRtmrRead {
 impl CsvGuestUserRtmrRead {
     pub fn new(bitmap: u32) -> Self {
         Self {
-            bitmap: bitmap,
+            bitmap,
             data: [0; CSV_RTMR_REG_SIZE],
         }
     }
@@ -87,7 +84,7 @@ impl CsvGuestUserRtmrRead {
         let mut buffer = vec![0u8; total_size].into_boxed_slice();
 
         let read = CsvGuestUserRtmrRead {
-            bitmap: bitmap,
+            bitmap,
             data: [0; CSV_RTMR_REG_SIZE],
         };
 
@@ -134,7 +131,7 @@ impl CsvGuestUserRtmrExtend {
             array[0..CSV_RTMR_EXTEND_LEN].copy_from_slice(&data[0..CSV_RTMR_EXTEND_LEN]);
 
             Ok(Self {
-                index: index,
+                index,
                 rsvd: 0,
                 data_len: CSV_RTMR_EXTEND_LEN as u16,
                 data: array,
