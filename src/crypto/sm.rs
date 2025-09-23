@@ -57,12 +57,7 @@ pub struct SM2 {}
 
 impl SM2 {
     /// use SM2 algorithm to verify a msg's signature
-    pub fn verify(
-        ecc_pubkey: ecc::PubKey,
-        sig: &[u8],
-        id: &Vec<u8>,
-        msg: &Vec<u8>,
-    ) -> Result<bool> {
+    pub fn verify(ecc_pubkey: ecc::PubKey, sig: &[u8], id: &[u8], msg: &[u8]) -> Result<bool> {
         let mut verify_result = false;
         let pubkey_size = ecc_pubkey.g.size()?;
 
@@ -163,7 +158,7 @@ impl SM2 {
         Ok((pubkey, eckey))
     }
 
-    pub fn sign(pri_key: *mut EC_KEY, id: &Vec<u8>, data: &Vec<u8>) -> Result<Vec<u8>> {
+    pub fn sign(pri_key: *mut EC_KEY, id: &[u8], data: &[u8]) -> Result<Vec<u8>> {
         let r = unsafe {
             let pkey = EVP_PKEY_new();
             if pkey.is_null() {

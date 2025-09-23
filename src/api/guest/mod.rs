@@ -64,7 +64,7 @@ impl CsvGuest {
         // Copy bytes from report_request to report_response
         response_bytes[..request_bytes.len()].copy_from_slice(request_bytes);
 
-        let mut guest_report_request = GuestReportRequest::new(response_bytes.as_ref());
+        let mut guest_report_request = GuestReportRequest::new(response_bytes);
 
         CSV_GET_REPORT.ioctl(&mut self.0, &mut guest_report_request)?;
 
@@ -74,12 +74,7 @@ impl CsvGuest {
             &report_response.tee_info.anonce,
         )?;
 
-
-        Ok(AttestationReportWrapper::new(
-            [0u8; 16],
-            0,
-            response_bytes
-        ))
+        Ok(AttestationReportWrapper::new([0u8; 16], 0, response_bytes))
     }
 
     /// Requests an extended attestation report (i.e. AttestationReportV2) from
@@ -97,7 +92,7 @@ impl CsvGuest {
         mnonce: Option<[u8; 16]>,
         flags: u32,
     ) -> Result<AttestationReportWrapper, Error> {
-        if self.check_attestation_report_v2_supported() == false {
+        if !self.check_attestation_report_v2_supported() {
             self.get_report(data, mnonce)
         } else if flags == 0 {
             // If flags is 0, generate AttestationReportV1.
@@ -131,15 +126,13 @@ impl CsvGuest {
             // Copy bytes from report_request_ext to report_response_ext
             response_bytes[..request_bytes.len()].copy_from_slice(request_bytes);
 
-            let mut guest_report_request = GuestReportRequest::new(response_bytes.as_ref());
+            let mut guest_report_request = GuestReportRequest::new(response_bytes);
 
             CSV_GET_REPORT.ioctl(&mut self.0, &mut guest_report_request)?;
 
-            report_response.signer.verify(
-                &mnonce_value,
-                &report_response.tee_info.mnonce,
-                &0,
-            )?;
+            report_response
+                .signer
+                .verify(&mnonce_value, &report_response.tee_info.mnonce, &0)?;
 
             Ok(AttestationReportWrapper::new(
                 ATTESTATION_EXT_MAGIC,
@@ -150,9 +143,7 @@ impl CsvGuest {
     }
 
     /// Request rtmr_status
-    pub fn req_rtmr_status(
-        &mut self,
-    ) -> Result<CsvGuestUserRtmrStatus, std::io::Error> {
+    pub fn req_rtmr_status(&mut self) -> Result<CsvGuestUserRtmrStatus, std::io::Error> {
         let mut rtmr_status = CsvGuestUserRtmrStatus::new();
 
         let rtmr_status_bytes: &mut [u8] = unsafe {
@@ -162,10 +153,8 @@ impl CsvGuest {
             )
         };
 
-        let mut rtmr_request = GuestRtmrRequest::new(
-            rtmr_status_bytes.as_ref(),
-            CsvGuestUserRtmrSubcmd::Status
-        );
+        let mut rtmr_request =
+            GuestRtmrRequest::new(rtmr_status_bytes, CsvGuestUserRtmrSubcmd::Status);
 
         match CSV_RTMR_REQ.ioctl(&mut self.0, &mut rtmr_request) {
             Ok(return_code) => {
@@ -176,19 +165,17 @@ impl CsvGuest {
                     } else {
                         Err(std::io::Error::new(
                             std::io::ErrorKind::Other,
-                            format!("rtmr_status fail, fw_err: {}", fw_error_code)
+                            format!("rtmr_status fail, fw_err: {}", fw_error_code),
                         ))
                     }
                 } else {
                     Err(std::io::Error::new(
                         std::io::ErrorKind::Other,
-                        format!("rtmr_status fail, rc: {}", return_code)
+                        format!("rtmr_status fail, rc: {}", return_code),
                     ))
                 }
             }
-            Err(err) => {
-                Err(err)
-            }
+            Err(err) => Err(err),
         }
     }
 
@@ -206,10 +193,8 @@ impl CsvGuest {
             )
         };
 
-        let mut rtmr_request = GuestRtmrRequest::new(
-            rtmr_start_bytes.as_ref(),
-            CsvGuestUserRtmrSubcmd::Start
-        );
+        let mut rtmr_request =
+            GuestRtmrRequest::new(rtmr_start_bytes, CsvGuestUserRtmrSubcmd::Start);
 
         match CSV_RTMR_REQ.ioctl(&mut self.0, &mut rtmr_request) {
             Ok(return_code) => {
@@ -220,26 +205,24 @@ impl CsvGuest {
                     } else {
                         Err(std::io::Error::new(
                             std::io::ErrorKind::Other,
-                            format!("rtmr_start fail, fw_err: {}", fw_error_code)
+                            format!("rtmr_start fail, fw_err: {}", fw_error_code),
                         ))
                     }
                 } else {
                     Err(std::io::Error::new(
                         std::io::ErrorKind::Other,
-                        format!("rtmr_start fail, rc: {}", return_code)
+                        format!("rtmr_start fail, rc: {}", return_code),
                     ))
                 }
             }
-            Err(err) => {
-                Err(err)
-            }
+            Err(err) => Err(err),
         }
     }
 
     /// Request rtmr_read
     pub fn req_rtmr_read(
         &mut self,
-        bitmap: u32
+        bitmap: u32,
     ) -> Result<(Box<[u8]>, &mut CsvGuestUserRtmrRead), std::io::Error> {
         let mut num_regs: usize = 0;
 
@@ -249,15 +232,11 @@ impl CsvGuest {
             }
         }
 
-        let (mut _buffer, rtmr_read) = CsvGuestUserRtmrRead::allocate_with_capacity(
-            bitmap,
-            num_regs
-        );
+        let (mut _buffer, rtmr_read) =
+            CsvGuestUserRtmrRead::allocate_with_capacity(bitmap, num_regs);
 
-        let mut rtmr_request = GuestRtmrRequest::new(
-            &_buffer.as_ref(),
-            CsvGuestUserRtmrSubcmd::Read
-        );
+        let mut rtmr_request =
+            GuestRtmrRequest::new(_buffer.as_ref(), CsvGuestUserRtmrSubcmd::Read);
 
         match CSV_RTMR_REQ.ioctl(&mut self.0, &mut rtmr_request) {
             Ok(return_code) => {
@@ -268,19 +247,17 @@ impl CsvGuest {
                     } else {
                         Err(std::io::Error::new(
                             std::io::ErrorKind::Other,
-                            format!("rtmr_read fail, fw_err: {}", fw_error_code)
+                            format!("rtmr_read fail, fw_err: {}", fw_error_code),
                         ))
                     }
                 } else {
                     Err(std::io::Error::new(
                         std::io::ErrorKind::Other,
-                        format!("rtmr_read fail, rc: {}", return_code)
+                        format!("rtmr_read fail, rc: {}", return_code),
                     ))
                 }
             }
-            Err(err) => {
-                Err(err)
-            }
+            Err(err) => Err(err),
         }
     }
 
@@ -299,10 +276,8 @@ impl CsvGuest {
             )
         };
 
-        let mut rtmr_request = GuestRtmrRequest::new(
-            rtmr_extend_bytes.as_ref(),
-            CsvGuestUserRtmrSubcmd::Extend
-        );
+        let mut rtmr_request =
+            GuestRtmrRequest::new(rtmr_extend_bytes, CsvGuestUserRtmrSubcmd::Extend);
 
         match CSV_RTMR_REQ.ioctl(&mut self.0, &mut rtmr_request) {
             Ok(return_code) => {
@@ -313,19 +288,17 @@ impl CsvGuest {
                     } else {
                         Err(std::io::Error::new(
                             std::io::ErrorKind::Other,
-                            format!("rtmr_extend fail, fw_err: {}", fw_error_code)
+                            format!("rtmr_extend fail, fw_err: {}", fw_error_code),
                         ))
                     }
                 } else {
                     Err(std::io::Error::new(
                         std::io::ErrorKind::Other,
-                        format!("rtmr_extend fail, rc: {}", return_code)
+                        format!("rtmr_extend fail, rc: {}", return_code),
                     ))
                 }
             }
-            Err(err) => {
-                Err(err)
-            }
+            Err(err) => Err(err),
         }
     }
 
@@ -333,9 +306,7 @@ impl CsvGuest {
     /// The rtmr_status request will succeed when rtmr is supported.
     pub fn check_rtmr_supported(&mut self) -> bool {
         match self.req_rtmr_status() {
-            Ok(_) => {
-                true
-            }
+            Ok(_) => true,
             Err(err) => {
                 println!("error: {}", err);
                 false

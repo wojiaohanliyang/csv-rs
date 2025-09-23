@@ -35,7 +35,7 @@ pub struct MkfdIoctlSecurityAttestationArgs {
     /// DCU identifier for target device
     pub dcu_id: u32,
     /// For compatibility
-    pub cmd_id :u32,
+    pub cmd_id: u32,
     /// Message version number(default 1)
     pub version: u32,
     /// Request structure address

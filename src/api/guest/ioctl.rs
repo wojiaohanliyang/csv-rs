@@ -17,8 +17,7 @@ pub enum CsvGuestIoctl {
 
 const CSV: Group = Group::new(b'D');
 
-/// //////////////////// Attestation report ioctl interface ////////////////////
-
+/// # Attestation report ioctl interface
 pub const CSV_GET_REPORT: Ioctl<WriteRead, &GuestReportRequest> =
     unsafe { CSV.write_read(CsvGuestIoctl::GetReport as u8) };
 
@@ -46,9 +45,7 @@ impl<'a> GuestReportRequest<'a> {
     }
 }
 
-
-/// ////////////////////// Rtmr operations ioctl interface /////////////////////
-
+/// Rtmr operations ioctl interface
 pub const CSV_RTMR_REQ: Ioctl<WriteRead, &GuestRtmrRequest> =
     unsafe { CSV.write_read(CsvGuestIoctl::RtmrReq as u8) };
 

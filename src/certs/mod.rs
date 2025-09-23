@@ -40,7 +40,7 @@ pub trait Signer<T> {
 
 /// Denotes a certificate's usage.
 #[repr(C)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Usage(u32);
 
 impl Usage {
@@ -63,12 +63,6 @@ impl Usage {
     pub const CEK: Usage = Usage(0x1004u32.to_le());
 
     const INV: Usage = Usage(0x1000u32.to_le());
-}
-
-impl Default for Usage {
-    fn default() -> Self {
-        Usage(0)
-    }
 }
 
 impl From<u32> for Usage {
@@ -108,19 +102,13 @@ impl TryFrom<Usage> for Algorithm {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Algorithm(u32);
 
 impl Algorithm {
     pub const SM2_SA: Algorithm = Algorithm(0x0004u32.to_le());
     pub const SM2_DH: Algorithm = Algorithm(0x0005u32.to_le());
     pub const NONE: Algorithm = Algorithm(0x0000u32.to_le());
-}
-
-impl Default for Algorithm {
-    fn default() -> Self {
-        Algorithm(0)
-    }
 }
 
 impl From<u32> for Algorithm {

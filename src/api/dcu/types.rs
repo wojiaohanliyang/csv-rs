@@ -9,11 +9,11 @@ use crate::{
     util::*,
 };
 
+use hex::encode;
 use log::*;
 use serde::{Deserialize, Serialize};
 use std::ffi::c_void;
 use std::io::Write;
-use hex::encode;
 
 /// A structure representing the body of an attestation report.
 /// This is marked with `repr(C)` for C compatibility and can be serialized/deserialized.
@@ -44,9 +44,9 @@ impl Default for Body {
         Self {
             version: Default::default(),
             chip_id: Default::default(),
-            user_data: [0u8;64],
+            user_data: [0u8; 64],
             measure: Default::default(),
-            reserved: [0u8;128],
+            reserved: [0u8; 128],
             sig_usage: Default::default(),
             sig_algo: Default::default(),
         }
@@ -58,7 +58,7 @@ impl Body {
     pub fn print_fields(&self) {
         trace!("Version: {}", self.version);
         trace!("Chip ID: {}", String::from_utf8_lossy(&self.chip_id));
-        trace!("User data: {}", encode(&self.user_data));
+        trace!("User data: {}", encode(self.user_data));
         trace!("Measure: {:?}", self.measure);
         trace!("Signature Usage: {}", self.sig_usage);
         trace!("Signature Algorithm: {}", self.sig_algo);

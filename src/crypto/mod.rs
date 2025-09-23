@@ -70,6 +70,6 @@ impl PublicKey {
     }
 
     pub fn encrypt(&self, data: &[u8]) -> Result<Vec<u8>> {
-        sm::SM2::encrypt(&data, self.key)
+        sm::SM2::encrypt(data, self.key)
     }
 }

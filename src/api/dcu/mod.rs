@@ -130,7 +130,10 @@ impl DcuDevice {
 /// * `Ok(())` if all reports pass verification
 /// * `Err(Error)` containing the first encountered verification failure
 #[cfg(feature = "network")]
-pub async fn verify_reports(reports: &[AttestationReport], userdata: &[u8; 64]) -> Result<(), Error> {
+pub async fn verify_reports(
+    reports: &[AttestationReport],
+    userdata: &[u8; 64],
+) -> Result<(), Error> {
     for report in reports {
         let cert_data = csv::cert::get_certificate_data(&report.body.chip_id).await?;
         verify_report(report, userdata, &cert_data)?;
@@ -196,7 +199,7 @@ pub fn verify_report(
 }
 
 /// Saves certificates to local files
-fn save_certificates(
+pub fn save_certificates(
     hsk: &ca::Certificate,
     cek: &csv::Certificate,
     hrk: &ca::Certificate,
@@ -207,8 +210,7 @@ fn save_certificates(
 
     // Create directory recursively if it doesn't exist (similar to mkdir -p)
     if !certs_dir.exists() {
-        fs::create_dir_all(certs_dir)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        fs::create_dir_all(certs_dir).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     }
 
     // Write HSK certificate

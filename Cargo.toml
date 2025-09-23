@@ -37,3 +37,9 @@ hex = "0.4.3"
 [dev-dependencies]
 serial_test = "2.0"
 test-log = "0.2"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(ossl111)',
+    'cfg(ossl300)',
+] }

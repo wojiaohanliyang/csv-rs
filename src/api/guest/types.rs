@@ -96,7 +96,7 @@ impl Default for ReportReqExt {
     fn default() -> Self {
         Self {
             data: [0u8; 64],
-            mnonce : [0u8; 16],
+            mnonce: [0u8; 16],
             hash: [0u8; 32],
             magic: ATTESTATION_EXT_MAGIC,
             flags: 0,
@@ -147,15 +147,15 @@ pub struct AttestationReportWrapper {
 }
 
 impl AttestationReportWrapper {
-    pub fn new(magic: [u8; 16], flags: u32, report: &mut [u8] ) -> Self {
+    pub fn new(magic: [u8; 16], flags: u32, report: &mut [u8]) -> Self {
         let mut bytes = [0u8; 4096];
 
         let copy_len = std::cmp::min(report.len(), 4096);
         bytes[..copy_len].copy_from_slice(&report[..copy_len]);
 
         Self {
-            magic: magic,
-            flags: flags,
+            magic,
+            flags,
             data: bytes,
         }
     }
@@ -193,12 +193,10 @@ impl TryFrom<&AttestationReportWrapper> for AttestationReport {
                 let report_v2: AttestationReportV2 = TryFrom::try_from(&report_wrapper.data[..])?;
                 Ok(AttestationReport::V2(report_v2))
             }
-            _ => {
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Invalid AttestationReport")
-                ))
-            }
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Invalid AttestationReport".to_string(),
+            )),
         }
     }
 }
@@ -242,8 +240,8 @@ pub struct AttestationReportV1 {
     pub signer: TeeInfoSigner,
     #[serde(with = "BigArray")]
     /// Padding bits to meet the memory page alignment.
-    reserved: [u8; 4096
-        - (std::mem::size_of::<TeeInfoV1>() + std::mem::size_of::<TeeInfoSigner>())],
+    reserved:
+        [u8; 4096 - (std::mem::size_of::<TeeInfoV1>() + std::mem::size_of::<TeeInfoSigner>())],
 }
 
 // Compile-time check that the size is what is expected.
@@ -266,8 +264,8 @@ impl TryFrom<&[u8]> for AttestationReportV1 {
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         bincode::deserialize(bytes).map_err(|e| {
             std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("Failed to deserialize AttestationReportV1: {}", e),
+                std::io::ErrorKind::InvalidData,
+                format!("Failed to deserialize AttestationReportV1: {}", e),
             )
         })
     }
@@ -287,8 +285,8 @@ pub struct AttestationReportV2 {
     pub signer: TeeInfoSigner,
     /// Padding bits to meet the memory page alignment.
     #[serde(with = "BigArray")]
-    reserved: [u8; 4096
-        - (std::mem::size_of::<TeeInfoV2>() + std::mem::size_of::<TeeInfoSigner>())],
+    reserved:
+        [u8; 4096 - (std::mem::size_of::<TeeInfoV2>() + std::mem::size_of::<TeeInfoSigner>())],
 }
 
 // Compile-time check that the size is what is expected.
@@ -311,8 +309,8 @@ impl TryFrom<&[u8]> for AttestationReportV2 {
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         bincode::deserialize(bytes).map_err(|e| {
             std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("Failed to deserialize AttestationReportV2: {}", e),
+                std::io::ErrorKind::InvalidData,
+                format!("Failed to deserialize AttestationReportV2: {}", e),
             )
         })
     }
@@ -333,7 +331,7 @@ pub enum TeeInfo<'a> {
     V2(&'a TeeInfoV2),
 }
 
-impl<'a> TeeInfo<'a> {
+impl TeeInfo<'_> {
     /// Restore raw field from the Tee info
     pub fn raw(&self, data: &[u8]) -> Vec<u8> {
         let mut data_bytes = data.to_vec();
@@ -349,163 +347,162 @@ impl<'a> TeeInfo<'a> {
 
     /// Get user_pubkey_digest field
     pub fn user_pubkey_digest(&self) -> Vec<u8> {
-        match self {
-            &Self::V1(tee_info) => self.raw(&tee_info.user_pubkey_digest[..]),
-            &Self::V2(tee_info) => tee_info.user_pubkey_digest.to_vec(),
+        match *self {
+            Self::V1(tee_info) => self.raw(&tee_info.user_pubkey_digest[..]),
+            Self::V2(tee_info) => tee_info.user_pubkey_digest.to_vec(),
         }
     }
 
     /// Get vm_id field
     pub fn vm_id(&self) -> Vec<u8> {
-        match self {
-            &Self::V1(tee_info) => self.raw(&tee_info.vm_id[..]),
-            &Self::V2(tee_info) => tee_info.vm_id.to_vec(),
+        match *self {
+            Self::V1(tee_info) => self.raw(&tee_info.vm_id[..]),
+            Self::V2(tee_info) => tee_info.vm_id.to_vec(),
         }
     }
 
     /// Get vm_version field
     pub fn vm_version(&self) -> Vec<u8> {
-        match self {
-            &Self::V1(tee_info) => self.raw(&tee_info.vm_version[..]),
-            &Self::V2(tee_info) => tee_info.vm_version.to_vec(),
+        match *self {
+            Self::V1(tee_info) => self.raw(&tee_info.vm_version[..]),
+            Self::V2(tee_info) => tee_info.vm_version.to_vec(),
         }
     }
 
     /// Get report_data field
     pub fn report_data(&self) -> Vec<u8> {
-        match self {
-            &Self::V1(tee_info) => self.raw(&tee_info.report_data[..]),
-            &Self::V2(tee_info) => tee_info.report_data.to_vec(),
+        match *self {
+            Self::V1(tee_info) => self.raw(&tee_info.report_data[..]),
+            Self::V2(tee_info) => tee_info.report_data.to_vec(),
         }
     }
 
     /// Get mnonce field
     pub fn mnonce(&self) -> Vec<u8> {
-        match self {
-            &Self::V1(tee_info) => self.raw(&tee_info.mnonce[..]),
-            &Self::V2(tee_info) => tee_info.mnonce.to_vec(),
+        match *self {
+            Self::V1(tee_info) => self.raw(&tee_info.mnonce[..]),
+            Self::V2(tee_info) => tee_info.mnonce.to_vec(),
         }
     }
 
     /// Get measure field
     pub fn measure(&self) -> Vec<u8> {
-        match self {
-            &Self::V1(tee_info) => self.raw(&tee_info.measure[..]),
-            &Self::V2(tee_info) => tee_info.measure.to_vec(),
+        match *self {
+            Self::V1(tee_info) => self.raw(&tee_info.measure[..]),
+            Self::V2(tee_info) => tee_info.measure.to_vec(),
         }
     }
 
     /// Get policy field
     pub fn policy(&self) -> GuestPolicy {
-        match self {
-            &Self::V1(tee_info) => tee_info.policy.xor(&self.anonce()),
-            &Self::V2(tee_info) => tee_info.policy,
+        match *self {
+            Self::V1(tee_info) => tee_info.policy.xor(&self.anonce()),
+            Self::V2(tee_info) => tee_info.policy,
         }
     }
 
     /// Get sig_usage field
     pub fn sig_usage(&self) -> u32 {
-        match self {
-            &Self::V1(tee_info) => tee_info.sig_usage ^ self.anonce(),
-            &Self::V2(tee_info) => tee_info.sig_usage,
+        match *self {
+            Self::V1(tee_info) => tee_info.sig_usage ^ self.anonce(),
+            Self::V2(tee_info) => tee_info.sig_usage,
         }
     }
 
     /// Get sig_algo field
     pub fn sig_algo(&self) -> u32 {
-        match self {
-            &Self::V1(tee_info) => tee_info.sig_algo ^ self.anonce(),
-            &Self::V2(tee_info) => tee_info.sig_algo,
+        match *self {
+            Self::V1(tee_info) => tee_info.sig_algo ^ self.anonce(),
+            Self::V2(tee_info) => tee_info.sig_algo,
         }
     }
 
     /// Get anonce field
     pub fn anonce(&self) -> u32 {
-        match self {
-            &Self::V1(tee_info) => tee_info.anonce,
-            &Self::V2(_) => 0,
+        match *self {
+            Self::V1(tee_info) => tee_info.anonce,
+            Self::V2(_) => 0,
         }
     }
 
     /// Get build field
     pub fn build(&self) -> u32 {
-        match self {
-            &Self::V1(_) => 0,
-            &Self::V2(tee_info) => tee_info.build,
+        match *self {
+            Self::V1(_) => 0,
+            Self::V2(tee_info) => tee_info.build,
         }
     }
 
     /// Get rtmr_version field
     pub fn rtmr_version(&self) -> u16 {
-        match self {
-            &Self::V1(_) => 0,
-            &Self::V2(tee_info) => tee_info.rtmr_version,
+        match *self {
+            Self::V1(_) => 0,
+            Self::V2(tee_info) => tee_info.rtmr_version,
         }
     }
 
     /// Get rtmr0 field
     pub fn rtmr0(&self) -> &[u8] {
-        match self {
-            &Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
-            &Self::V2(tee_info) => &tee_info.rtmr0,
+        match *self {
+            Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
+            Self::V2(tee_info) => &tee_info.rtmr0,
         }
     }
 
     /// Get rtmr1 field
     pub fn rtmr1(&self) -> &[u8] {
-        match self {
-            &Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
-            &Self::V2(tee_info) => &tee_info.rtmr1,
+        match *self {
+            Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
+            Self::V2(tee_info) => &tee_info.rtmr1,
         }
     }
 
     /// Get rtmr2 field
     pub fn rtmr2(&self) -> &[u8] {
-        match self {
-            &Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
-            &Self::V2(tee_info) => &tee_info.rtmr2,
+        match *self {
+            Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
+            Self::V2(tee_info) => &tee_info.rtmr2,
         }
     }
 
     /// Get rtmr3 field
     pub fn rtmr3(&self) -> &[u8] {
-        match self {
-            &Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
-            &Self::V2(tee_info) => &tee_info.rtmr3,
+        match *self {
+            Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
+            Self::V2(tee_info) => &tee_info.rtmr3,
         }
     }
 
     /// Get rtmr4 field
     pub fn rtmr4(&self) -> &[u8] {
-        match self {
-            &Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
-            &Self::V2(tee_info) => &tee_info.rtmr4,
+        match *self {
+            Self::V1(_) => &[0u8; CSV_RTMR_REG_SIZE],
+            Self::V2(tee_info) => &tee_info.rtmr4,
         }
     }
 }
-
 
 impl<'a> TryFrom<&'a TeeInfo<'a>> for Signature {
     type Error = std::io::Error;
 
     #[inline]
     fn try_from(value: &'a TeeInfo<'a>) -> Result<Self, std::io::Error> {
-        match value {
-            &TeeInfo::V1(v1) => {
+        match *value {
+            TeeInfo::V1(v1) => {
                 let sig = Vec::try_from(&v1.sig)?;
                 Ok(Self {
                     sig,
                     id: None,
-                    usage: Usage::PEK.into(),
+                    usage: Usage::PEK,
                     algo: None,
                 })
             }
-            &TeeInfo::V2(v2) => {
+            TeeInfo::V2(v2) => {
                 let sig = Vec::try_from(&v2.sig)?;
                 Ok(Self {
                     sig,
                     id: None,
-                    usage: Usage::PEK.into(),
+                    usage: Usage::PEK,
                     algo: None,
                 })
             }
@@ -521,21 +518,17 @@ impl<'a> Verifiable for (&'a Certificate, &'a TeeInfo<'a>) {
         let key: PublicKey = cert.try_into()?;
         let sig: Signature = tee_info.try_into()?;
 
-        match tee_info {
-            &TeeInfo::V1(v1) => {
-                key.verify(
-                    v1,
-                    &self.0.body.data.user_id[..self.0.body.data.uid_size as usize],
-                    &sig,
-                )
-            }
-            &TeeInfo::V2(v2) => {
-                key.verify(
-                    v2,
-                    &self.0.body.data.user_id[..self.0.body.data.uid_size as usize],
-                    &sig,
-                )
-            }
+        match *tee_info {
+            TeeInfo::V1(v1) => key.verify(
+                v1,
+                &self.0.body.data.user_id[..self.0.body.data.uid_size as usize],
+                &sig,
+            ),
+            TeeInfo::V2(v2) => key.verify(
+                v2,
+                &self.0.body.data.user_id[..self.0.body.data.uid_size as usize],
+                &sig,
+            ),
         }
     }
 }

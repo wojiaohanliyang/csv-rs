@@ -151,7 +151,7 @@ impl Session<Initialized> {
         rand::rand_bytes(&mut nonce)?;
         rand::rand_bytes(&mut iv)?;
 
-        let session = self.session(nonce, iv, z, &pdh, prv)?;
+        let session = self.session(nonce, iv, z, pdh, prv)?;
 
         (&crt, &session).verify()?;
 
@@ -205,8 +205,8 @@ impl Session<Initialized> {
     /// Verifies the HYGON SP's measurement.
     pub fn verify(
         self,
-        digest: &[u8],
-        build: Build,
+        _digest: &[u8],
+        _build: Build,
         msr: api::launch::Measurement,
     ) -> Result<Session<Verified>> {
         //TODO: open it after drgonball support
@@ -307,7 +307,7 @@ impl Session<Verified> {
         let mut sig = sign::Signer::new(hash::MessageDigest::sm3(), &key)?;
 
         sig.update(&[0x01u8])?;
-        sig.update(&unsafe { std::mem::transmute::<_, [u8; 4]>(flags) })?;
+        sig.update(&unsafe { std::mem::transmute::<api::launch::HeaderFlags, [u8; 4]>(flags) })?;
         sig.update(&iv)?;
         sig.update(&(data.len() as u32).to_le_bytes())?;
         sig.update(&(ciphertext.len() as u32).to_le_bytes())?;

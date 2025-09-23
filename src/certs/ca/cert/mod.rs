@@ -71,7 +71,7 @@ impl TryFrom<&Certificate> for Signature {
         Ok(Self {
             sig,
             id: Some(value.body.preamble.data.sid),
-            usage: Usage::HRK.into(),
+            usage: Usage::HRK,
             algo: None,
         })
     }
@@ -87,7 +87,7 @@ impl TryFrom<&Certificate> for PublicKey {
             id: Some(value.body.preamble.data.kid),
             key,
             usage: value.body.preamble.data.usage,
-            algo: Some(Algorithm::SM2_SA.into()),
+            algo: Some(Algorithm::SM2_SA),
         })
     }
 }
