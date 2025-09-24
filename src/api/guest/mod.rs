@@ -93,52 +93,63 @@ impl CsvGuest {
         flags: u32,
     ) -> Result<AttestationReportWrapper, Error> {
         if !self.check_attestation_report_v2_supported() {
-            self.get_report(data, mnonce)
-        } else if flags == 0 {
-            // If flags is 0, generate AttestationReportV1.
-            self.get_report(data, mnonce)
-        } else {
-            let mut mnonce_value = [0u8; 16];
-            if let Some(mnonce) = mnonce {
-                mnonce_value = mnonce;
-            } else {
-                let mut rng = rand::thread_rng();
-                for element in &mut mnonce_value {
-                    *element = rng.gen();
+            return self.get_report(data, mnonce);
+        }
+
+        match flags {
+            // 0 means AttestationReportV1.
+            0 => self.get_report(data, mnonce),
+            // AttestationExtFlags::EXT_U32 means AttestationReportV2.
+            AttestationExtFlags::EXT_U32 => {
+                let mut mnonce_value = [0u8; 16];
+                if let Some(mnonce) = mnonce {
+                    mnonce_value = mnonce;
+                } else {
+                    let mut rng = rand::thread_rng();
+                    for element in &mut mnonce_value {
+                        *element = rng.gen();
+                    }
                 }
+
+                let report_request = ReportReqExt::new(data, mnonce_value, flags)?;
+
+                let mut report_response = AttestationReportV2::default();
+
+                // Convert ReportReqExt to bytes
+                let request_bytes: &[u8] = unsafe {
+                    let req_ptr = &report_request as *const ReportReqExt as *const u8;
+                    std::slice::from_raw_parts(req_ptr, std::mem::size_of::<ReportReqExt>())
+                };
+
+                let response_bytes: &mut [u8] = unsafe {
+                    let rsp_ptr = &mut report_response as *mut AttestationReportV2 as *mut u8;
+                    std::slice::from_raw_parts_mut(
+                        rsp_ptr,
+                        std::mem::size_of::<AttestationReportV2>(),
+                    )
+                };
+
+                // Copy bytes from report_request_ext to report_response_ext
+                response_bytes[..request_bytes.len()].copy_from_slice(request_bytes);
+
+                let mut guest_report_request = GuestReportRequest::new(response_bytes);
+
+                CSV_GET_REPORT.ioctl(&mut self.0, &mut guest_report_request)?;
+
+                report_response.signer.verify(
+                    &mnonce_value,
+                    &report_response.tee_info.mnonce,
+                    &0,
+                )?;
+
+                Ok(AttestationReportWrapper::new(
+                    ATTESTATION_EXT_MAGIC,
+                    flags,
+                    response_bytes,
+                ))
             }
-
-            let report_request = ReportReqExt::new(data, mnonce_value, flags)?;
-
-            let mut report_response = AttestationReportV2::default();
-
-            // Convert ReportReqExt to bytes
-            let request_bytes: &[u8] = unsafe {
-                let req_ptr = &report_request as *const ReportReqExt as *const u8;
-                std::slice::from_raw_parts(req_ptr, std::mem::size_of::<ReportReqExt>())
-            };
-
-            let response_bytes: &mut [u8] = unsafe {
-                let rsp_ptr = &mut report_response as *mut AttestationReportV2 as *mut u8;
-                std::slice::from_raw_parts_mut(rsp_ptr, std::mem::size_of::<AttestationReportV2>())
-            };
-
-            // Copy bytes from report_request_ext to report_response_ext
-            response_bytes[..request_bytes.len()].copy_from_slice(request_bytes);
-
-            let mut guest_report_request = GuestReportRequest::new(response_bytes);
-
-            CSV_GET_REPORT.ioctl(&mut self.0, &mut guest_report_request)?;
-
-            report_response
-                .signer
-                .verify(&mnonce_value, &report_response.tee_info.mnonce, &0)?;
-
-            Ok(AttestationReportWrapper::new(
-                ATTESTATION_EXT_MAGIC,
-                flags,
-                response_bytes,
-            ))
+            // Fallback to the latest version of the attestation report.
+            _ => self.get_report_ext(data, mnonce, AttestationExtFlags::EXT_U32),
         }
     }
 

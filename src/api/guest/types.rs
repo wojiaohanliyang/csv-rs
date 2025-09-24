@@ -23,8 +23,19 @@ use serde_big_array::BigArray;
 use std::io::Write;
 
 use bitfield::bitfield;
+use bitflags::bitflags;
 
 pub const ATTESTATION_EXT_MAGIC: [u8; 16] = *b"ATTESTATION_EXT\0";
+
+bitflags! {
+    pub struct AttestationExtFlags: u32 {
+        const EXT = 1 << 0;
+    }
+}
+
+impl AttestationExtFlags {
+    pub const EXT_U32: u32 = Self::EXT.bits();
+}
 
 /// Data provieded by the guest owner for requesting an attestation report
 /// from the HYGON Secure Processor.
@@ -139,7 +150,6 @@ pub struct AttestationReportWrapper {
     /// The magic string to indicate the attestation report type.
     magic: [u8; 16],
     /// The flags indicate how to parse the extended attestation report.
-    /// Note: the bit0 of flags must be 1.
     flags: u32,
     #[serde(with = "BigArray")]
     /// Both the legacy and extended attestation report are padded to 4096 bytes.
@@ -189,7 +199,7 @@ impl TryFrom<&AttestationReportWrapper> for AttestationReport {
                 let report_v1: AttestationReportV1 = TryFrom::try_from(&report_wrapper.data[..])?;
                 Ok(AttestationReport::V1(report_v1))
             }
-            (ATTESTATION_EXT_MAGIC, 1) => {
+            (ATTESTATION_EXT_MAGIC, AttestationExtFlags::EXT_U32) => {
                 let report_v2: AttestationReportV2 = TryFrom::try_from(&report_wrapper.data[..])?;
                 Ok(AttestationReport::V2(report_v2))
             }
@@ -533,8 +543,7 @@ impl<'a> Verifiable for (&'a Certificate, &'a TeeInfo<'a>) {
     }
 }
 
-/// Data provieded by the guest owner for requesting an attestation report
-/// from the HYGON Secure Processor.
+/// The tee_info field of AttestationReportV1.
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TeeInfoV1 {
@@ -607,8 +616,7 @@ impl codicon::Encoder<crate::Body> for TeeInfoV1 {
     }
 }
 
-/// Data provieded by the guest owner for requesting an extended attestation
-/// report from the HYGON Secure Processor.
+/// The tee_info field of AttestationReportV2.
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TeeInfoV2 {
