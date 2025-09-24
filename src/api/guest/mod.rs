@@ -386,12 +386,12 @@ impl CsvGuest {
     }
 
     /// Query if AttestationReportV3 is supported. It's supported when the
-    /// fw build > 2400.
+    /// fw build > 2300.
     pub fn check_attestation_report_v3_supported(&mut self) -> Result<bool, Error> {
         if self.check_attestation_report_v2_supported() {
             let _report = self.get_report_ext(None, None, AttestationExtFlags::EXT_U32)?;
             let report = AttestationReport::try_from(&_report)?;
-            if report.tee_info().build() >= 2400 {
+            if report.tee_info().build() >= 2300 {
                 Ok(true)
             } else {
                 Ok(false)
